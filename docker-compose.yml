@@ -1,0 +1,54 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: imdc/app:latest
+    container_name: imdc_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./:/var/www/html
+      - ./storage:/var/www/html/storage
+    depends_on:
+      - db
+      - redis
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: imdc_nginx
+    restart: unless-stopped
+    volumes:
+      - ./:/var/www/html:ro
+      - ./storage:/var/www/html/storage
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "80:80"
+    depends_on:
+      - app
+
+  db:
+    image: postgres:15-alpine
+    container_name: imdc_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - imdc_db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    container_name: imdc_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
+
+volumes:
+  imdc_db_data:

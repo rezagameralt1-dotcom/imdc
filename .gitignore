@@ -19,3 +19,10 @@
 
 # Env local
 .env.local
+# === IMDC additions ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+.DS_Store

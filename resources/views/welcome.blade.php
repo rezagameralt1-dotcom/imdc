@@ -276,3 +276,5 @@
         @endif
     </body>
 </html>
+
+<div class="mt-6 text-center text-sm opacity-70">New footer</div>
