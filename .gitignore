@@ -2,32 +2,17 @@
 /vendor/
 /node_modules/
 /public/build/
-/bootstrap/cache/*
-!/bootstrap/cache/.gitignore
-/storage/*.key
-/storage/*.log
-/storage/*.cache
-/storage/*.pid
-/storage/*.sqlite
-/storage/app/public/*
-!/storage/app/public/.gitignore
-/storage/framework/cache/*
-!/storage/framework/cache/.gitignore
-/storage/framework/sessions/*
-!/storage/framework/sessions/.gitignore
-/storage/framework/views/*
-!/storage/framework/views/.gitignore
-/storage/logs/*
-!/storage/logs/.gitignore
+/public/storage
+/storage
 
-# Env & local stuff
+# Env & caches
 .env
-.env.*
-!.env.example
+.env.*.local
+.phpunit.result.cache
+.php-cs-fixer.cache
 
-# Editor/OS
-.vscode/
-.idea/
-*.swp
+# IDE & OS
+/.idea/
+/.vscode/
+/*.sqlite
 .DS_Store
-Thumbs.db
