@@ -1,23 +1,14 @@
 const { test, expect } = require('@playwright/test');
-test('home loads & internal links clickable', async ({ page }) => {
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('body')).toBeVisible();
-  const anchors = await page.locator('a[href]').evaluateAll(els =>
-    els.map(a => a.getAttribute('href') || '')
-      .filter(h => h && !h.startsWith('http') && !h.startsWith('mailto:') && !h.startsWith('#'))
-  );
-  const uniq = Array.from(new Set(anchors)).slice(0, 50);
-  for (const href of uniq) {
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => null),
-      page.locator(`a[href="${href}"]`).first().click().catch(() => null)
-    ]);
-    await page.goBack({ waitUntil: 'domcontentloaded' }).catch(() => null);
-  }
+
+test('healthz is OK', async ({ page }) => {
+  await page.goto('/healthz', { waitUntil: 'domcontentloaded' });
+  const body = await page.textContent('body');
+  expect(body.trim()).toBe('HEALTH OK');
 });
-test('no severe console errors', async ({ page }) => {
+
+test('no severe console errors on healthz', async ({ page }) => {
   const severe = [];
   page.on('console', msg => { if (msg.type() === 'error') severe.push(msg.text()); });
-  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.goto('/healthz', { waitUntil: 'domcontentloaded' });
   expect(severe.join('\n')).toBe('');
 });

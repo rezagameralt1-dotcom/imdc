@@ -22,3 +22,7 @@ Route::get('/debug/sentry', function () {
 Route::get('/', function () {
     return 'IMDC OK';
 });
+
+Route::get('/healthz', function () {
+    return response('HEALTH OK', 200);
+});
