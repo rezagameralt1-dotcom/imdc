@@ -1,0 +1,26 @@
+{
+  "info": {
+    "name": "DigitalCity Public API",
+    "_postman_id": "b1ea76be-7f1a-4b2f-8db5-0d98a1f2a9aa",
+    "description": "Basic requests for DigitalCity public endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Posts (v2)",
+      "request": { "method": "GET", "url": "{{base_url}}/api/v2/posts" }
+    },
+    {
+      "name": "Pages (v2)",
+      "request": { "method": "GET", "url": "{{base_url}}/api/v2/pages" }
+    },
+    {
+      "name": "Search",
+      "request": { "method": "GET", "url": "{{base_url}}/api/search?q=hello" }
+    }
+  ],
+  "variable": [
+    { "key": "base_url", "value": "http://digitalcity.test" }
+  ]
+}
+

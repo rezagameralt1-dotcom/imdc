@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+set -euo pipefail
+REPO="/var/www/imdc"
+cd "$REPO"
+
+MSG_PREFIX="chore(auto): sync"
+INTERVAL="\${INTERVAL:-60}"
+
+have_inotify=0
+if command -v inotifywait >/dev/null 2>&1; then
+  have_inotify=1
+fi
+
+echo "[auto-sync] starting in $REPO (inotify=$have_inotify; interval=${INTERVAL}s)"
+
+sync_once() {
+  # اگر چیزی برای کامیت نیست، برگرد
+  if git diff --quiet --ignore-submodules HEAD -- >/dev/null 2>&1 && \
+     git diff --cached --quiet --ignore-submodules -- >/dev/null 2>&1; then
+    return 0
+  fi
+  ts="$(date +%Y-%m-%dT%H:%M:%S%z)"
+  git add -A
+  if ! git diff --cached --quiet; then
+    git commit -m "$MSG_PREFIX: $ts" || true
+    git pull --rebase || true
+    git push || true
+    echo "[auto-sync] pushed at $ts"
+  fi
+}
+
+if [ "$have_inotify" -eq 1 ]; then
+  # رویدادمحور: تغییر/ساخت/حذف/جابجایی
+  while inotifywait -e modify,create,delete,move -r "$REPO" >/dev/null 2>&1; do
+    sync_once
+  done
+else
+  # دوره‌ای: هر N ثانیه
+  while true; do
+    sync_once
+    sleep "$INTERVAL"
+  done
+fi

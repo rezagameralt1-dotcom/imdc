@@ -20,3 +20,5 @@ build/
 *.tmp
 *.bak.*
 
+# allow tracking of VS Code settings (override ignore rules if any)
+!.vscode/**
