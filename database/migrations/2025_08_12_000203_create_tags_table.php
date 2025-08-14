@@ -4,10 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('tags')) {
+        if (! Schema::hasTable('tags')) {
             Schema::create('tags', function (Blueprint $t) {
                 $t->id();
                 $t->string('name')->unique();
@@ -21,4 +22,3 @@ return new class extends Migration {
         Schema::dropIfExists('tags');
     }
 };
-

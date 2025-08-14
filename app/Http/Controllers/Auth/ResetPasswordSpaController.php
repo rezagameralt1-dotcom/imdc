@@ -3,11 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Password;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Str;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class ResetPasswordSpaController extends Controller
 {
@@ -15,12 +15,12 @@ class ResetPasswordSpaController extends Controller
     {
         $request->validate([
             'token' => ['required'],
-            'email' => ['required','email'],
-            'password' => ['required','confirmed','min:8'],
+            'email' => ['required', 'email'],
+            'password' => ['required', 'confirmed', 'min:8'],
         ]);
 
         $status = Password::reset(
-            $request->only('email','password','password_confirmation','token'),
+            $request->only('email', 'password', 'password_confirmation', 'token'),
             function ($user, $password) {
                 $user->forceFill([
                     'password' => Hash::make($password),
@@ -36,4 +36,3 @@ class ResetPasswordSpaController extends Controller
             : response()->json(['ok' => false, 'message' => __($status)], 422);
     }
 }
-

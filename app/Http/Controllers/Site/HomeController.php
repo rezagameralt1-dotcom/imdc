@@ -13,8 +13,8 @@ class HomeController extends Controller
         if ($page) {
             return view('site.pages.show', compact('page'));
         }
+
         // اگر صفحه home نداریم، همان UI دمو را نشان بده
         return redirect()->route('ui');
     }
 }
-

@@ -18,13 +18,13 @@ class HandleInertiaRequests extends Middleware
     {
         return array_merge(parent::share($request), [
             'auth' => ['user' => $request->user()],
-            'app'  => [
-                'name'   => config('app.name', 'IMDC'),
+            'app' => [
+                'name' => config('app.name', 'IMDC'),
                 'locale' => app()->getLocale(),
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
+                'error' => fn () => $request->session()->get('error'),
             ],
         ]);
     }

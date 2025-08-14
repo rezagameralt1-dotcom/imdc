@@ -1,8 +1,8 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -29,7 +29,9 @@ return new class extends Migration
 
     private function backfillPostsStatus(): void
     {
-        if (!Schema::hasTable('posts')) return;
+        if (! Schema::hasTable('posts')) {
+            return;
+        }
 
         // PostgreSQL-safe batching: pick IDs then update WHERE IN (no LIMIT in UPDATE)
         do {
@@ -38,7 +40,9 @@ return new class extends Migration
                 ->whereNull('status')
                 ->limit(1000)
                 ->pluck('id');
-            if ($ids->isEmpty()) break;
+            if ($ids->isEmpty()) {
+                break;
+            }
 
             DB::table('posts')->whereIn('id', $ids)->update(['status' => 'draft']);
         } while (true);
@@ -46,7 +50,9 @@ return new class extends Migration
 
     private function backfillMessagesReadAt(): void
     {
-        if (!Schema::hasTable('messages')) return;
+        if (! Schema::hasTable('messages')) {
+            return;
+        }
 
         do {
             $ids = DB::table('messages')
@@ -55,7 +61,9 @@ return new class extends Migration
                 ->where('is_read', true)
                 ->limit(1000)
                 ->pluck('id');
-            if ($ids->isEmpty()) break;
+            if ($ids->isEmpty()) {
+                break;
+            }
 
             DB::table('messages')->whereIn('id', $ids)->update(['read_at' => now()]);
         } while (true);
@@ -68,13 +76,15 @@ return new class extends Migration
             // Ensure status default
             try {
                 DB::statement("ALTER TABLE orders ALTER COLUMN status SET DEFAULT 'pending'");
-            } catch (\Throwable $e) { /* ignore if already set */ }
+            } catch (\Throwable $e) { /* ignore if already set */
+            }
         }
         if (Schema::hasTable('posts')) {
             // Ensure non-null title
             try {
-                DB::statement("ALTER TABLE posts ALTER COLUMN title SET NOT NULL");
-            } catch (\Throwable $e) { /* ignore */ }
+                DB::statement('ALTER TABLE posts ALTER COLUMN title SET NOT NULL');
+            } catch (\Throwable $e) { /* ignore */
+            }
         }
     }
 };

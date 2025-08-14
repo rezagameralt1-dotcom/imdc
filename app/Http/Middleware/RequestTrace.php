@@ -1,11 +1,12 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\Response;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\Response;
 
 class RequestTrace
 {
@@ -22,6 +23,7 @@ class RequestTrace
         /** @var \Symfony\Component\HttpFoundation\Response $response */
         $response = $next($request);
         $response->headers->set('X-Trace-Id', $trace);
+
         return $response;
     }
 }

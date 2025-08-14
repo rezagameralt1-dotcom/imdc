@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PanicCode extends Model
 {
-    protected $fillable = ['user_id','code_hash','last_triggered_at'];
+    protected $fillable = ['user_id', 'code_hash', 'last_triggered_at'];
 
     protected $casts = [
         'last_triggered_at' => 'datetime',

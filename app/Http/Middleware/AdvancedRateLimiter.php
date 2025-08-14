@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
@@ -37,7 +38,7 @@ class AdvancedRateLimiter
 
         $now = microtime(true);
         $state = Cache::store()->get($key, null);
-        if (!$state) {
+        if (! $state) {
             $state = ['tokens' => $burst, 'ts' => $now];
         }
 
@@ -57,15 +58,16 @@ class AdvancedRateLimiter
         // Headers
         $remaining = (int) floor($tokens);
         $headers = [
-            'X-RateLimit-Limit'     => (string) $limit,
+            'X-RateLimit-Limit' => (string) $limit,
             'X-RateLimit-Remaining' => (string) $remaining,
         ];
 
-        if (!$allowed) {
+        if (! $allowed) {
             // compute wait time to next token
             $need = 1.0 - $tokens;
             $retry_after = (int) ceil($need / ($rate_per_sec ?: 0.000001));
             $headers['Retry-After'] = (string) $retry_after;
+
             return response()->json([
                 'success' => false,
                 'error' => 'Too Many Requests',
@@ -76,8 +78,11 @@ class AdvancedRateLimiter
         /** @var Response $response */
         $response = $next($request);
         foreach ($headers as $k => $v) {
-            if (!$response->headers->has($k)) $response->headers->set($k, $v);
+            if (! $response->headers->has($k)) {
+                $response->headers->set($k, $v);
+            }
         }
+
         return $response;
     }
 
@@ -94,6 +99,7 @@ class AdvancedRateLimiter
                 break;
             }
         }
+
         return [$limit, $burst];
     }
 
@@ -101,16 +107,25 @@ class AdvancedRateLimiter
     {
         $ex = (array) config('rate.exempt_ips', []);
         foreach ($ex as $pattern) {
-            if ($pattern === $ip) return true;
+            if ($pattern === $ip) {
+                return true;
+            }
             // simple CIDR (only /8,/16,/24 supported quickly)
             if (preg_match('#^(\d+)\.(\d+)\.(\d+)\.(\d+)/(8|16|24)$#', $pattern, $m)) {
                 [$all,$a,$b,$c,$d,$mask] = $m;
                 $ipParts = explode('.', $ip);
-                if ($mask == '8'  && $ipParts[0] == $a) return true;
-                if ($mask == '16' && $ipParts[0] == $a && $ipParts[1] == $b) return true;
-                if ($mask == '24' && $ipParts[0] == $a && $ipParts[1] == $b && $ipParts[2] == $c) return true;
+                if ($mask == '8' && $ipParts[0] == $a) {
+                    return true;
+                }
+                if ($mask == '16' && $ipParts[0] == $a && $ipParts[1] == $b) {
+                    return true;
+                }
+                if ($mask == '24' && $ipParts[0] == $a && $ipParts[1] == $b && $ipParts[2] == $c) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
 }

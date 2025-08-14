@@ -2,13 +2,14 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
 use App\Models\User;
+use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
 class PromoteAdmin extends Command
 {
     protected $signature = 'digitalcity:admin:promote {email}';
+
     protected $description = 'Promote a user to admin by email.';
 
     public function handle(): int
@@ -19,6 +20,7 @@ class PromoteAdmin extends Command
 
         if (! $user) {
             $this->error("User not found: {$email}");
+
             return self::FAILURE;
         }
 
@@ -31,7 +33,7 @@ class PromoteAdmin extends Command
         });
 
         $this->info("User promoted to admin: {$email}");
+
         return self::SUCCESS;
     }
 }
-

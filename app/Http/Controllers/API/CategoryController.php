@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
-use App\Models\Category;
 use App\Http\Resources\CategoryResource;
+use App\Models\Category;
 
 class CategoryController extends ApiController
 {
@@ -16,4 +17,3 @@ class CategoryController extends ApiController
         return new CategoryResource($category);
     }
 }
-

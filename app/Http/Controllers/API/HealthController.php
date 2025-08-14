@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -26,6 +27,7 @@ class HealthController extends Controller
         } catch (\Throwable $e) {
             $db = false;
         }
+
         return ApiResponse::success(['ready' => $db]);
     }
 }

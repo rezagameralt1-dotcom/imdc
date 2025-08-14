@@ -4,10 +4,11 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('settings')) {
+        if (! Schema::hasTable('settings')) {
             Schema::create('settings', function (Blueprint $t) {
                 $t->string('key')->primary();
                 $t->text('value')->nullable();
@@ -21,4 +22,3 @@ return new class extends Migration {
         Schema::dropIfExists('settings');
     }
 };
-

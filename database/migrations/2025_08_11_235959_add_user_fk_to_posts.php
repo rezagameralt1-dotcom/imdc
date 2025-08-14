@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -11,15 +12,15 @@ return new class extends Migration
     public function up(): void
     {
         // اگر جدول‌ها موجود نیستند، خطا می‌گیریم تا ریشه‌ای حل شود (چشم‌پوشی نمی‌کنیم)
-        if (!Schema::hasTable('posts')) {
+        if (! Schema::hasTable('posts')) {
             throw new RuntimeException("Table 'posts' does not exist. Create it before adding user_id.");
         }
-        if (!Schema::hasTable('users')) {
+        if (! Schema::hasTable('users')) {
             throw new RuntimeException("Table 'users' does not exist. Create it before adding FK from posts.");
         }
 
         // 1) اگر user_id نداریم، اضافه‌اش می‌کنیم (nullable موقت برای داده‌های فعلی)
-        if (!Schema::hasColumn('posts', 'user_id')) {
+        if (! Schema::hasColumn('posts', 'user_id')) {
             Schema::table('posts', function (Blueprint $table) {
                 $table->foreignId('user_id')->nullable()->constrained('users')->cascadeOnDelete();
             });
@@ -28,13 +29,13 @@ return new class extends Migration
         // 2) اگر author_id داریم و user_id هم (الان) داریم، مقادیر رو منتقل کن
         if (Schema::hasColumn('posts', 'author_id') && Schema::hasColumn('posts', 'user_id')) {
             // فقط nullهایی که user_id ندارن را از author_id پر می‌کنیم
-            DB::statement("
+            DB::statement('
                 UPDATE posts
                 SET user_id = CASE
                     WHEN user_id IS NULL THEN author_id
                     ELSE user_id
                 END
-            ");
+            ');
         }
 
         // 3) اگر ستون user_id هنوز null-های بدون مرجع دارد و نیاز داری اجباری باشد،

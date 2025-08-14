@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('wallets')) {
+        if (! Schema::hasTable('wallets')) {
             Schema::create('wallets', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('user_id');
@@ -18,7 +20,7 @@ return new class extends Migration {
                 $t->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('nft_transfers')) {
+        if (! Schema::hasTable('nft_transfers')) {
             Schema::create('nft_transfers', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('from_wallet_id')->nullable();

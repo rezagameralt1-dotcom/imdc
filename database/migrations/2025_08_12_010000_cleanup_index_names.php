@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -16,29 +17,32 @@ return new class extends Migration
     private function sanitize(string $name): string
     {
         $name = strtolower(preg_replace('/[^a-z0-9_]+/', '', $name));
-        if (strlen($name) <= 63) return $name;
+        if (strlen($name) <= 63) {
+            return $name;
+        }
         // shorten: keep beginning + hash tail to ensure uniqueness
         $hash = substr(sha1($name), 0, 8);
-        return substr($name, 0, 54) . '_' . $hash; // total 63
+
+        return substr($name, 0, 54).'_'.$hash; // total 63
     }
 
     /** @param string[] $columns */
     private function ensureIndex(string $table, array $columns, ?string $name = null): void
     {
-        if (!Schema::hasTable($table)) {
+        if (! Schema::hasTable($table)) {
             throw new RuntimeException("Table '{$table}' does not exist.");
         }
         foreach ($columns as $col) {
-            if (!Schema::hasColumn($table, $col)) {
+            if (! Schema::hasColumn($table, $col)) {
                 throw new RuntimeException("Column '{$table}.{$col}' does not exist.");
             }
         }
 
-        $canonical = $this->sanitize($name ?: ($table . '_' . implode('_', $columns) . '_idx'));
+        $canonical = $this->sanitize($name ?: ($table.'_'.implode('_', $columns).'_idx'));
 
         // Check if any index already covers exactly these columns (order-insensitive check via pg_get_indexdef)
         $colsList = implode('","', $columns);
-        $sql = <<<SQL
+        $sql = <<<'SQL'
             SELECT i.relname AS index_name, pg_get_indexdef(ix.indexrelid) AS def
             FROM pg_index ix
             JOIN pg_class c ON c.oid = ix.indrelid
@@ -55,15 +59,19 @@ return new class extends Migration
             $def = strtolower($row->def);
             $ok = true;
             foreach ($columns as $col) {
-                if (strpos($def, '("' . strtolower($col) . '"') === false && strpos($def, '(' . strtolower($col) . ')') === false) {
-                    $ok = false; break;
+                if (strpos($def, '("'.strtolower($col).'"') === false && strpos($def, '('.strtolower($col).')') === false) {
+                    $ok = false;
+                    break;
                 }
             }
-            if ($ok) { $covered = true; break; }
+            if ($ok) {
+                $covered = true;
+                break;
+            }
         }
 
-        if (!$covered) {
-            $cols = '"' . $colsList . '"';
+        if (! $covered) {
+            $cols = '"'.$colsList.'"';
             $sqlCreate = sprintf('CREATE INDEX IF NOT EXISTS %s ON "%s" (%s)', $canonical, $table, $cols);
             DB::statement($sqlCreate);
         }
@@ -91,7 +99,7 @@ return new class extends Migration
         $this->ensureIndex('order_items', ['product_id']);
         $this->ensureIndex('inventory', ['product_id']);
         // composite commonly used
-        $this->ensureIndex('order_items', ['order_id','product_id']);
+        $this->ensureIndex('order_items', ['order_id', 'product_id']);
 
         // Wallets / NFTs
         $this->ensureIndex('wallets', ['user_id']);
@@ -108,7 +116,7 @@ return new class extends Migration
         $this->ensureIndex('proposals', ['ends_at']);
         $this->ensureIndex('votes', ['proposal_id']);
         $this->ensureIndex('votes', ['user_id']);
-        $this->ensureIndex('votes', ['proposal_id','user_id']); // supports unique check scans
+        $this->ensureIndex('votes', ['proposal_id', 'user_id']); // supports unique check scans
 
         // Accounting / Audit
         $this->ensureIndex('accounts', ['user_id']);

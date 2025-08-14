@@ -32,4 +32,3 @@ class PostPolicy
         return (bool) $user->is_admin || $user->id === $post->author_id;
     }
 }
-

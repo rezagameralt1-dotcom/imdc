@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
@@ -12,16 +13,17 @@ class ImdcBuildRelease extends Command
         {--no-frontend : Skip building frontend (npm)}
         {--no-composer : Skip composer install --no-dev}
         {--zip-only : Only zip current tree (no build steps)}';
+
     protected $description = 'Build production ZIP (no dev/test), include compiled assets and caches';
 
     public function handle(): int
     {
         $ts = now()->format('Ymd_His');
-        $baseName = $this->option('name') . '-' . $ts;
+        $baseName = $this->option('name').'-'.$ts;
         $releasesDir = storage_path('releases');
         File::ensureDirectoryExists($releasesDir);
 
-        $workDir = storage_path('app/release_work_' . $ts);
+        $workDir = storage_path('app/release_work_'.$ts);
         File::ensureDirectoryExists($workDir);
 
         $this->info("Preparing working directory: {$workDir}");
@@ -39,7 +41,7 @@ class ImdcBuildRelease extends Command
             $path = $file->getPathname();
             $rel = ltrim(str_replace($root, '', $path), DIRECTORY_SEPARATOR);
             // skip self (storage/release_work_...)
-            if (str_starts_with($rel, 'storage' . DIRECTORY_SEPARATOR . 'release_work_')) {
+            if (str_starts_with($rel, 'storage'.DIRECTORY_SEPARATOR.'release_work_')) {
                 continue;
             }
             // ignore
@@ -48,7 +50,7 @@ class ImdcBuildRelease extends Command
                     continue 2;
                 }
             }
-            $dest = $workDir . DIRECTORY_SEPARATOR . $rel;
+            $dest = $workDir.DIRECTORY_SEPARATOR.$rel;
             if ($file->isDir()) {
                 File::ensureDirectoryExists($dest);
             } else {
@@ -58,12 +60,14 @@ class ImdcBuildRelease extends Command
         }
 
         // Composer install (prod)
-        if (!$this->option('zip-only') && !$this->option('no-composer')) {
+        if (! $this->option('zip-only') && ! $this->option('no-composer')) {
             if (self::binExists('composer')) {
                 $this->info('Running composer install --no-dev --optimize-autoloader ...');
                 $p = Process::fromShellCommandline('composer install --no-dev --optimize-autoloader', $workDir, null, null, 1800);
-                $p->run(function ($type, $buffer) { echo $buffer; });
-                if (!$p->isSuccessful()) {
+                $p->run(function ($type, $buffer) {
+                    echo $buffer;
+                });
+                if (! $p->isSuccessful()) {
                     $this->warn('Composer install failed; continuing with source only.');
                 }
             } else {
@@ -72,18 +76,20 @@ class ImdcBuildRelease extends Command
         }
 
         // Frontend build (if present)
-        if (!$this->option('zip-only') && !$this->option('no-frontend') && file_exists(base_path('package.json'))) {
+        if (! $this->option('zip-only') && ! $this->option('no-frontend') && file_exists(base_path('package.json'))) {
             if (self::binExists('npm')) {
                 $this->info('Building frontend (npm ci && npm run build) ...');
                 $p = Process::fromShellCommandline('npm ci && npm run build', base_path(), null, null, 1800);
-                $p->run(function ($type, $buffer) { echo $buffer; });
+                $p->run(function ($type, $buffer) {
+                    echo $buffer;
+                });
                 if ($p->isSuccessful()) {
                     // Try to copy common dist paths into public/assets
                     $targets = ['dist', 'build'];
                     foreach ($targets as $t) {
                         $src = base_path($t);
                         if (is_dir($src)) {
-                            $dst = $workDir . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR . 'assets';
+                            $dst = $workDir.DIRECTORY_SEPARATOR.'public'.DIRECTORY_SEPARATOR.'assets';
                             File::ensureDirectoryExists($dst);
                             self::copyDir($src, $dst);
                             break;
@@ -98,39 +104,44 @@ class ImdcBuildRelease extends Command
         }
 
         // Optimize caches inside workdir (if artisan exists)
-        if (!$this->option('zip-only') && file_exists($workDir . '/artisan')) {
+        if (! $this->option('zip-only') && file_exists($workDir.'/artisan')) {
             $this->info('Caching config/routes/views (artisan) ...');
-            $cmd = PHP_BINARY . ' artisan config:cache && ' . PHP_BINARY . ' artisan route:cache && ' . PHP_BINARY . ' artisan view:cache';
+            $cmd = PHP_BINARY.' artisan config:cache && '.PHP_BINARY.' artisan route:cache && '.PHP_BINARY.' artisan view:cache';
             $p = Process::fromShellCommandline($cmd, $workDir, null, null, 300);
-            $p->run(function ($type, $buffer) { echo $buffer; });
-            if (!$p->isSuccessful()) {
+            $p->run(function ($type, $buffer) {
+                echo $buffer;
+            });
+            if (! $p->isSuccessful()) {
                 $this->warn('Artisan cache build failed; continuing.');
             }
         }
 
         // Ensure env example present
-        if (!file_exists($workDir . '/.env.example') && file_exists(base_path('.env.example'))) {
-            File::copy(base_path('.env.example'), $workDir . '/.env.example');
+        if (! file_exists($workDir.'/.env.example') && file_exists(base_path('.env.example'))) {
+            File::copy(base_path('.env.example'), $workDir.'/.env.example');
         }
 
         // Include docs
         if (file_exists(base_path('docs'))) {
-            self::copyDir(base_path('docs'), $workDir . '/docs');
+            self::copyDir(base_path('docs'), $workDir.'/docs');
         }
 
         // Create ZIP
-        $zipPath = $releasesDir . DIRECTORY_SEPARATOR . $baseName . '.zip';
+        $zipPath = $releasesDir.DIRECTORY_SEPARATOR.$baseName.'.zip';
         $this->info("Creating ZIP: {$zipPath}");
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         if ($zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE) !== true) {
             $this->error('Cannot create zip');
+
             return self::FAILURE;
         }
         $rii2 = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($workDir, \FilesystemIterator::SKIP_DOTS));
         foreach ($rii2 as $file) {
             $filePath = $file->getPathname();
             $rel = ltrim(str_replace($workDir, '', $filePath), DIRECTORY_SEPARATOR);
-            if ($file->isDir()) continue;
+            if ($file->isDir()) {
+                continue;
+            }
             $zip->addFile($filePath, $rel);
         }
         $zip->close();
@@ -139,7 +150,8 @@ class ImdcBuildRelease extends Command
         self::rrmdir($workDir);
 
         $this->info("Release ready: {$zipPath}");
-        $this->line("Install guide: docs/IMDC_SETUP_FA.md");
+        $this->line('Install guide: docs/IMDC_SETUP_FA.md');
+
         return self::SUCCESS;
     }
 
@@ -150,6 +162,7 @@ class ImdcBuildRelease extends Command
             null, null, null, 10
         );
         $p->run();
+
         return $p->isSuccessful();
     }
 
@@ -158,7 +171,7 @@ class ImdcBuildRelease extends Command
         $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($src, \FilesystemIterator::SKIP_DOTS));
         foreach ($it as $f) {
             $rel = ltrim(str_replace($src, '', $f->getPathname()), DIRECTORY_SEPARATOR);
-            $to = $dst . DIRECTORY_SEPARATOR . $rel;
+            $to = $dst.DIRECTORY_SEPARATOR.$rel;
             if ($f->isDir()) {
                 File::ensureDirectoryExists($to);
             } else {
@@ -170,7 +183,9 @@ class ImdcBuildRelease extends Command
 
     private static function rrmdir(string $dir): void
     {
-        if (!is_dir($dir)) return;
+        if (! is_dir($dir)) {
+            return;
+        }
         $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS), \RecursiveIteratorIterator::CHILD_FIRST);
         foreach ($it as $f) {
             $f->isDir() ? rmdir($f->getPathname()) : unlink($f->getPathname());

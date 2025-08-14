@@ -2,12 +2,12 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Seeder;
 use App\Models\Category;
-use App\Models\Tag;
 use App\Models\Page;
 use App\Models\Post;
+use App\Models\Tag;
 use App\Models\User;
+use Illuminate\Database\Seeder;
 use Illuminate\Support\Str;
 
 class ContentSeeder extends Seeder
@@ -15,24 +15,22 @@ class ContentSeeder extends Seeder
     public function run(): void
     {
         // Categories
-        $cats = collect(['News','Guides','Updates'])->map(fn($n) =>
-            Category::firstOrCreate(['slug' => Str::slug($n)], ['name' => $n])
+        $cats = collect(['News', 'Guides', 'Updates'])->map(fn ($n) => Category::firstOrCreate(['slug' => Str::slug($n)], ['name' => $n])
         );
 
         // Tags
-        $tags = collect(['important','release','how-to','urgent'])->map(fn($n) =>
-            Tag::firstOrCreate(['name' => $n])
+        $tags = collect(['important', 'release', 'how-to', 'urgent'])->map(fn ($n) => Tag::firstOrCreate(['name' => $n])
         );
 
         // Pages
         Page::firstOrCreate(['slug' => 'about'], [
             'title' => 'About DigitalCity',
-            'body'  => 'This is a demo About page for DigitalCity. Edit me in admin.',
+            'body' => 'This is a demo About page for DigitalCity. Edit me in admin.',
         ]);
 
         Page::firstOrCreate(['slug' => 'home'], [
             'title' => 'Welcome to DigitalCity',
-            'body'  => 'Landing page placeholder. Build your homepage here.',
+            'body' => 'Landing page placeholder. Build your homepage here.',
         ]);
 
         // Sample Post
@@ -41,8 +39,8 @@ class ContentSeeder extends Seeder
             $title = 'Welcome Post';
             $slug = Str::slug($title);
             $i = 1;
-            while (Post::where('slug',$slug)->exists()) {
-                $slug = Str::slug($title) . '-' . (++$i);
+            while (Post::where('slug', $slug)->exists()) {
+                $slug = Str::slug($title).'-'.(++$i);
             }
 
             $post = Post::firstOrCreate(['slug' => $slug], [
@@ -59,4 +57,3 @@ class ContentSeeder extends Seeder
         }
     }
 }
-

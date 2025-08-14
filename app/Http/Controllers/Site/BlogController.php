@@ -11,13 +11,13 @@ class BlogController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim((string) $request->get('q',''));
-        $posts = Post::where('status','published')
-            ->when($q !== '', function($query) use ($q) {
-                $query->where(function($w) use ($q){
-                    $w->where('title','like',"%$q%")
-                      ->orWhere('excerpt','like',"%$q%")
-                      ->orWhere('body','like',"%$q%");
+        $q = trim((string) $request->get('q', ''));
+        $posts = Post::where('status', 'published')
+            ->when($q !== '', function ($query) use ($q) {
+                $query->where(function ($w) use ($q) {
+                    $w->where('title', 'like', "%$q%")
+                        ->orWhere('excerpt', 'like', "%$q%")
+                        ->orWhere('body', 'like', "%$q%");
                 });
             })
             ->orderByDesc('published_at')
@@ -26,14 +26,15 @@ class BlogController extends Controller
             ->withQueryString();
         $metaTitle = $q ? "بلاگ - جست‌وجو: $q" : 'بلاگ';
         $metaDescription = 'آخرین مطالب منتشرشده';
-        return view('site.blog.index', compact('posts','q','metaTitle','metaDescription'));
+
+        return view('site.blog.index', compact('posts', 'q', 'metaTitle', 'metaDescription'));
     }
 
     public function show(string $slug)
     {
-        $post = Post::where('slug',$slug)->where('status','published')->first();
-        if (!$post) {
-            $old = PostSlug::where('slug',$slug)->first();
+        $post = Post::where('slug', $slug)->where('status', 'published')->first();
+        if (! $post) {
+            $old = PostSlug::where('slug', $slug)->first();
             if ($old && $old->post) {
                 return redirect()->route('blog.show', $old->post->slug, 301);
             }
@@ -41,7 +42,7 @@ class BlogController extends Controller
         }
         $metaTitle = $post->title;
         $metaDescription = $post->excerpt ?: \Illuminate\Support\Str::limit(strip_tags($post->body ?? ''), 150);
+
         return view('site.blog.show', compact('post','metaTitle','metaDescription'));
     }
 }
-

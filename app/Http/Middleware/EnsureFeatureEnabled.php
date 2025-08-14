@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use App\Support\ApiResponse;
@@ -15,9 +16,10 @@ class EnsureFeatureEnabled
      */
     public function handle(Request $request, Closure $next, string $featureKey): Response
     {
-        if (!FeatureFlags::enabled($featureKey, false)) {
+        if (! FeatureFlags::enabled($featureKey, false)) {
             return ApiResponse::error("Feature '{$featureKey}' is disabled", 404);
         }
+
         return $next($request);
     }
 }

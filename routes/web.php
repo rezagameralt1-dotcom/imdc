@@ -13,6 +13,12 @@ Route::get('/api/docs', function () {
 
 // Sentry test route (only in local)
 Route::get('/debug/sentry', function () {
-    if (!app()->environment('local')) abort(404);
+    if (! app()->environment('local')) {
+        abort(404);
+    }
     throw new \RuntimeException('Sentry test exception from /debug/sentry');
+});
+
+Route::get('/', function () {
+    return 'IMDC OK';
 });

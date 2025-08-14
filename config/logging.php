@@ -1,9 +1,6 @@
 <?php
 
 use Monolog\Handler\NullHandler;
-use Monolog\Handler\StreamHandler;
-use Monolog\Handler\SyslogUdp\UdpSocket;
-use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
@@ -20,7 +17,7 @@ return [
             'driver' => 'stack',
             'channels' => ['daily'],
             'ignore_exceptions' => false,
-            'processors' => [new PsrLogMessageProcessor()],
+            'processors' => [new PsrLogMessageProcessor],
         ],
 
         // Log rotator: new file per day, keep 14 days
@@ -45,4 +42,3 @@ return [
         ],
     ],
 ];
-

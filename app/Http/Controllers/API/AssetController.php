@@ -1,11 +1,11 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
-use Illuminate\Http\Request;
-use App\Models\Asset;
 use App\Http\Resources\AssetResource;
+use App\Models\Asset;
+use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Storage;
 
 class AssetController extends ApiController
 {
@@ -34,7 +34,7 @@ class AssetController extends ApiController
             'size' => $file->getSize(),
             'uuid' => (string) Str::uuid(),
         ]);
+
         return new AssetResource($asset);
     }
 }
-

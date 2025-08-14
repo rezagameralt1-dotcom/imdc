@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -22,7 +23,7 @@ return new class extends Migration
 
     private function ensureInteger(string $table, string $column, bool $big = false): void
     {
-        if (!$this->ensureTable($table) || Schema::hasColumn($table, $column)) {
+        if (! $this->ensureTable($table) || Schema::hasColumn($table, $column)) {
             return;
         }
         $type = $big ? 'BIGINT' : 'INTEGER';
@@ -31,7 +32,7 @@ return new class extends Migration
 
     private function ensureVarchar(string $table, string $column, int $len = 255): void
     {
-        if (!$this->ensureTable($table) || Schema::hasColumn($table, $column)) {
+        if (! $this->ensureTable($table) || Schema::hasColumn($table, $column)) {
             return;
         }
         DB::statement("ALTER TABLE \"{$table}\" ADD COLUMN \"{$column}\" VARCHAR({$len}) NULL");
@@ -39,7 +40,7 @@ return new class extends Migration
 
     private function ensureJson(string $table, string $column): void
     {
-        if (!$this->ensureTable($table) || Schema::hasColumn($table, $column)) {
+        if (! $this->ensureTable($table) || Schema::hasColumn($table, $column)) {
             return;
         }
         DB::statement("ALTER TABLE \"{$table}\" ADD COLUMN \"{$column}\" JSON NULL");
@@ -47,7 +48,7 @@ return new class extends Migration
 
     private function ensureTimestamp(string $table, string $column): void
     {
-        if (!$this->ensureTable($table) || Schema::hasColumn($table, $column)) {
+        if (! $this->ensureTable($table) || Schema::hasColumn($table, $column)) {
             return;
         }
         DB::statement("ALTER TABLE \"{$table}\" ADD COLUMN \"{$column}\" TIMESTAMP NULL");

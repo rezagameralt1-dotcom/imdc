@@ -14,8 +14,8 @@ class AllowStopImpersonating
         if (session()->has('impersonator_id')) {
             return $next($request);
         }
+
         // Otherwise, continue (admin gate already applied on route group)
         return $next($request);
     }
 }
-

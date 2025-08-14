@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Jobs;
 
 use Illuminate\Bus\Queueable;
@@ -13,7 +14,9 @@ class SendMailJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public string $mailableClass;
+
     public array $mailableArgs;
+
     public string $to;
 
     public function __construct(string $mailableClass, array $mailableArgs, string $to)

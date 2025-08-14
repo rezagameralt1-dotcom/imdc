@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -9,16 +10,17 @@ class WalletController extends Controller
 {
     public function index()
     {
-        if (!\Schema::hasTable('wallets')) {
+        if (! \Schema::hasTable('wallets')) {
             return ApiResponse::success(['wallets' => []]);
         }
         $rows = DB::table('wallets')->orderByDesc('id')->limit(50)->get();
+
         return ApiResponse::success(['wallets' => $rows]);
     }
 
     public function store()
     {
-        if (!\Schema::hasTable('wallets')) {
+        if (! \Schema::hasTable('wallets')) {
             return ApiResponse::error('wallets table missing', 400);
         }
         $id = DB::table('wallets')->insertGetId([
@@ -27,6 +29,7 @@ class WalletController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
         return ApiResponse::success(['id' => $id]);
     }
 }

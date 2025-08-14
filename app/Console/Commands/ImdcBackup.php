@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
@@ -8,6 +9,7 @@ use Symfony\Component\Process\Process;
 class ImdcBackup extends Command
 {
     protected $signature = 'imdc:backup {--compress : gzip the SQL dump}';
+
     protected $description = 'Create PostgreSQL database backup and rotate old backups/logs';
 
     public function handle(): int
@@ -29,7 +31,7 @@ class ImdcBackup extends Command
 
         $timestamp = now()->format('Ymd_His');
         $baseName = "imdc_{$db['name']}_{$timestamp}.sql";
-        $dumpPath = rtrim($backupDir, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . $baseName;
+        $dumpPath = rtrim($backupDir, DIRECTORY_SEPARATOR).DIRECTORY_SEPARATOR.$baseName;
 
         // Build pg_dump command
         $args = [
@@ -52,8 +54,9 @@ class ImdcBackup extends Command
 
         // Stream output to file
         $fp = fopen($dumpPath, 'w');
-        if (!$fp) {
+        if (! $fp) {
             $this->error("Cannot open path for writing: {$dumpPath}");
+
             return self::FAILURE;
         }
         $process->run(function ($type, $buffer) use ($fp) {
@@ -61,21 +64,24 @@ class ImdcBackup extends Command
         });
         fclose($fp);
 
-        if (!$process->isSuccessful()) {
+        if (! $process->isSuccessful()) {
             $this->error('pg_dump failed. Check that PostgreSQL client tools are installed and credentials are valid.');
             $this->line($process->getErrorOutput());
             // Remove partial file
-            if (File::exists($dumpPath)) File::delete($dumpPath);
+            if (File::exists($dumpPath)) {
+                File::delete($dumpPath);
+            }
+
             return self::FAILURE;
         }
 
         // Optional compression
         if ($this->option('compress')) {
-            $gzPath = $dumpPath . '.gz';
+            $gzPath = $dumpPath.'.gz';
             $this->info("Compressing to: {$gzPath}");
             $gz = gzopen($gzPath, 'w9');
             $in = fopen($dumpPath, 'rb');
-            while (!feof($in)) {
+            while (! feof($in)) {
                 gzwrite($gz, fread($in, 1024 * 512));
             }
             fclose($in);
@@ -91,7 +97,9 @@ class ImdcBackup extends Command
             $cutoff = now()->subDays($retention);
             $deleted = 0;
             foreach (File::files($backupDir) as $file) {
-                if ($file->getExtension() !== 'sql' && $file->getExtension() !== 'gz') continue;
+                if ($file->getExtension() !== 'sql' && $file->getExtension() !== 'gz') {
+                    continue;
+                }
                 if ($file->getMTime() < $cutoff->getTimestamp()) {
                     File::delete($file->getRealPath());
                     $deleted++;
@@ -115,6 +123,7 @@ class ImdcBackup extends Command
         }
 
         $this->info('Backup finished successfully.');
+
         return self::SUCCESS;
     }
 }

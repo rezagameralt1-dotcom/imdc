@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Support;
 
 use Illuminate\Http\JsonResponse;
@@ -10,6 +11,7 @@ final class ApiResponse
     {
         $payload = ['success' => true, 'data' => $data] + $extra;
         $payload['trace_id'] = self::traceId();
+
         return response()->json($payload, $status);
     }
 
@@ -17,6 +19,7 @@ final class ApiResponse
     {
         $payload = ['success' => false, 'error' => $message] + $extra;
         $payload['trace_id'] = self::traceId();
+
         return response()->json($payload, $status);
     }
 
@@ -25,6 +28,7 @@ final class ApiResponse
         try {
             $req = request();
             $tid = $req->header('X-Trace-Id') ?: $req->headers->get('X-Trace-Id');
+
             return $tid ?: (string) Str::uuid();
         } catch (\Throwable $e) {
             return (string) Str::uuid();

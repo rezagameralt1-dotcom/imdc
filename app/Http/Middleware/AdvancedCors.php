@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
@@ -9,7 +10,7 @@ class AdvancedCors
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (!config('cors.enable', true)) {
+        if (! config('cors.enable', true)) {
             return $next($request);
         }
 
@@ -28,9 +29,11 @@ class AdvancedCors
         foreach ($routes as $prefix => $name) {
             if ($path === $prefix || str_starts_with($path, rtrim($prefix, '/').'/')) {
                 $prof = config("cors.profiles.$name") ?: config('cors.profiles.default');
+
                 return [$name, $prof];
             }
         }
+
         return ['default', config('cors.profiles.default')];
     }
 
@@ -39,15 +42,15 @@ class AdvancedCors
         $origin = $request->headers->get('Origin');
         $allowedOrigins = $p['origins'] ?? ['*'];
         $allowOrigin = '*';
-        if (!in_array('*', $allowedOrigins, true) && $origin && $this->originAllowed($origin, $allowedOrigins)) {
+        if (! in_array('*', $allowedOrigins, true) && $origin && $this->originAllowed($origin, $allowedOrigins)) {
             $allowOrigin = $origin;
-        } elseif (!in_array('*', $allowedOrigins, true)) {
+        } elseif (! in_array('*', $allowedOrigins, true)) {
             // No wildcard and origin not matched: do not set CORS headers
             return $response;
         }
 
         $this->set($response, 'Access-Control-Allow-Origin', $allowOrigin);
-        if (!empty($p['credentials'])) {
+        if (! empty($p['credentials'])) {
             $this->set($response, 'Access-Control-Allow-Credentials', 'true');
         }
 
@@ -58,7 +61,9 @@ class AdvancedCors
 
         $this->set($response, 'Access-Control-Allow-Methods', $allowMethods);
         $this->set($response, 'Access-Control-Allow-Headers', $allowHeaders);
-        if ($expose) $this->set($response, 'Access-Control-Expose-Headers', $expose);
+        if ($expose) {
+            $this->set($response, 'Access-Control-Expose-Headers', $expose);
+        }
         $this->set($response, 'Access-Control-Max-Age', $maxAge);
 
         return $response;
@@ -67,19 +72,24 @@ class AdvancedCors
     private function originAllowed(string $origin, array $allowedOrigins): bool
     {
         foreach ($allowedOrigins as $ao) {
-            if ($ao === $origin) return true;
+            if ($ao === $origin) {
+                return true;
+            }
             // Support wildcard suffix like https://*.example.com
             if (str_contains($ao, '*')) {
-                $pattern = '#^' . str_replace('\*', '.*', preg_quote($ao, '#')) . '$#i';
-                if (preg_match($pattern, $origin)) return true;
+                $pattern = '#^'.str_replace('\*', '.*', preg_quote($ao, '#')).'$#i';
+                if (preg_match($pattern, $origin)) {
+                    return true;
+                }
             }
         }
+
         return false;
     }
 
     private function set(Response $res, string $key, string $val): void
     {
-        if (!$res->headers->has($key)) {
+        if (! $res->headers->has($key)) {
             $res->headers->set($key, $val);
         }
     }

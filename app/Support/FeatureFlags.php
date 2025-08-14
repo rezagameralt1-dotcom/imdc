@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Support;
 
 use Illuminate\Support\Facades\Cache;
@@ -10,7 +11,7 @@ class FeatureFlags
     {
         $key = strtoupper(trim($key));
         // 1) ENV fallback if present (e.g., FEATURE_EXCHANGE=true)
-        $envName = 'FEATURE_' . $key;
+        $envName = 'FEATURE_'.$key;
         $env = env($envName, null);
         if ($env !== null) {
             return filter_var($env, FILTER_VALIDATE_BOOLEAN);
@@ -20,6 +21,7 @@ class FeatureFlags
         $val = Cache::remember("ff:{$key}", 30, function () use ($key) {
             try {
                 $row = DB::table('feature_flags')->where('key', $key)->first();
+
                 return $row ? (bool) $row->enabled : null;
             } catch (\Throwable $e) {
                 return null;
@@ -30,6 +32,7 @@ class FeatureFlags
         if ($val === null) {
             return (bool) ($default ?? false);
         }
+
         return (bool) $val;
     }
 

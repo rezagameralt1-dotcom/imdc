@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class AdminActivityLog extends Model
 {
-    protected $fillable = ['user_id','action','meta','ip'];
+    protected $fillable = ['user_id', 'action', 'meta', 'ip'];
 
-    public static function add(?int $userId, string $action, array $meta = [], ?string $ip=null): void
+    public static function add(?int $userId, string $action, array $meta = [], ?string $ip = null): void
     {
         static::create([
             'user_id' => $userId,
@@ -18,4 +18,3 @@ class AdminActivityLog extends Model
         ]);
     }
 }
-

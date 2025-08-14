@@ -13,7 +13,7 @@ return [
         'save' => 'Save',
         'cancel' => 'Cancel',
         'create' => 'Create',
-        'edit'   => 'Edit',
+        'edit' => 'Edit',
         'delete' => 'Delete',
         'update' => 'Update',
         'search' => 'Search',
@@ -26,4 +26,3 @@ return [
         'success' => 'Your message has been sent. Thanks!',
     ],
 ];
-

@@ -16,7 +16,7 @@ class AssetController extends Controller
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($w) use ($q) {
                     $w->where('original_name', 'like', "%$q%")
-                      ->orWhere('mime', 'like', "%$q%");
+                        ->orWhere('mime', 'like', "%$q%");
                 });
             })
             ->orderByDesc('id')
@@ -29,7 +29,7 @@ class AssetController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'files.*' => ['required','file','mimes:jpg,jpeg,png,webp,pdf','max:5120'],
+            'files.*' => ['required', 'file', 'mimes:jpg,jpeg,png,webp,pdf', 'max:5120'],
         ]);
 
         $saved = 0;
@@ -39,11 +39,13 @@ class AssetController extends Controller
 
             $mime = $file->getClientMimeType();
             $size = $file->getSize();
-            $w = null; $h = null;
+            $w = null;
+            $h = null;
             if (str_starts_with((string) $mime, 'image/')) {
                 try {
                     [$w, $h] = getimagesize($file->getRealPath());
-                } catch (\Throwable $e) { /* ignore */ }
+                } catch (\Throwable $e) { /* ignore */
+                }
             }
 
             Asset::create([
@@ -66,10 +68,13 @@ class AssetController extends Controller
     public function destroy(Asset $asset)
     {
         if ($asset->disk && $asset->path) {
-            try { Storage::disk($asset->disk)->delete($asset->path); } catch (\Throwable $e) {}
+            try {
+                Storage::disk($asset->disk)->delete($asset->path);
+            } catch (\Throwable $e) {
+            }
         }
         $asset->delete();
-        return back()->with('ok','فایل حذف شد.');
+
+        return back()->with('ok', 'فایل حذف شد.');
     }
 }
-

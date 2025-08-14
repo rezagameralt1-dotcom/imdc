@@ -1,4 +1,5 @@
 <?php
+
 return [
     'csp' => [
         'enable' => env('SECURITY_CSP_ENABLE', true),
@@ -29,8 +30,8 @@ return [
                 env('APP_URL', 'http://localhost'),
             ],
             'object-src' => ["'none'"],
-            'media-src'  => ["'self'"],
-            'frame-src'  => ["'none'"],
+            'media-src' => ["'self'"],
+            'frame-src' => ["'none'"],
             'worker-src' => ["'self'"],
             'manifest-src' => ["'self'"],
             // Only set if you have a report endpoint or external collector
@@ -56,7 +57,7 @@ return [
         'x_frame_options' => env('SECURITY_X_FRAME_OPTIONS', 'DENY'),
         'x_content_type_options' => 'nosniff',
         'referrer_policy' => env('SECURITY_REFERRER_POLICY', 'strict-origin-when-cross-origin'),
-        'permissions_policy' => env('SECURITY_PERMISSIONS_POLICY', "geolocation=(), microphone=(), camera=(), payment=(), usb=()"),
+        'permissions_policy' => env('SECURITY_PERMISSIONS_POLICY', 'geolocation=(), microphone=(), camera=(), payment=(), usb=()'),
         'cross_origin_opener_policy' => env('SECURITY_COOP', 'same-origin'),
         'cross_origin_resource_policy' => env('SECURITY_CORP', 'same-origin'),
         'cross_origin_embedder_policy' => env('SECURITY_COEP', null), // e.g., require-corp

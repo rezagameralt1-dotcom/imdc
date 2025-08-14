@@ -1,7 +1,5 @@
 <?php
 
-use Laravel\Sanctum\Sanctum;
-
 return [
     'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', 'digitalcity.test:5173,digitalcity.test')),
     'guard' => ['web'],
@@ -11,4 +9,3 @@ return [
         'encrypt_cookies' => App\Http\Middleware\EncryptCookies::class,
     ],
 ];
-

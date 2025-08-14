@@ -20,7 +20,6 @@ class TestPingMail extends Mailable
     public function build()
     {
         return $this->subject('DigitalCity Test')
-                    ->text('emails.test_ping_plain');
+            ->text('emails.test_ping_plain');
     }
 }
-

@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('shops')) {
+        if (! Schema::hasTable('shops')) {
             Schema::create('shops', function (Blueprint $t) {
                 $t->id();
                 $t->string('name');
@@ -17,7 +19,7 @@ return new class extends Migration {
                 $t->foreign('owner_id')->references('id')->on('users')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('products')) {
+        if (! Schema::hasTable('products')) {
             Schema::create('products', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('shop_id');
@@ -29,7 +31,7 @@ return new class extends Migration {
                 $t->foreign('shop_id')->references('id')->on('shops')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('orders')) {
+        if (! Schema::hasTable('orders')) {
             Schema::create('orders', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('user_id');
@@ -39,7 +41,7 @@ return new class extends Migration {
                 $t->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('order_items')) {
+        if (! Schema::hasTable('order_items')) {
             Schema::create('order_items', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('order_id');
@@ -51,7 +53,7 @@ return new class extends Migration {
                 $t->foreign('product_id')->references('id')->on('products')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('inventory')) {
+        if (! Schema::hasTable('inventory')) {
             Schema::create('inventory', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('product_id');

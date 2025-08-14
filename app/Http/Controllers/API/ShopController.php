@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -10,8 +11,9 @@ class ShopController extends Controller
 {
     public function index(Request $request)
     {
-        $shops = DB::table('shops')->select('id','name','owner_id','created_at')
-            ->orderBy('name')->paginate(min((int)$request->query('per_page', 20), 100));
+        $shops = DB::table('shops')->select('id', 'name', 'owner_id', 'created_at')
+            ->orderBy('name')->paginate(min((int) $request->query('per_page', 20), 100));
+
         return ApiResponse::success($shops);
     }
 
@@ -22,11 +24,12 @@ class ShopController extends Controller
             'owner_id' => 'required|integer|exists:users,id',
         ]);
         $id = DB::table('shops')->insertGetId([
-            'name'=>$data['name'],
-            'owner_id'=>$data['owner_id'],
-            'created_at'=>now(),
-            'updated_at'=>now(),
+            'name' => $data['name'],
+            'owner_id' => $data['owner_id'],
+            'created_at' => now(),
+            'updated_at' => now(),
         ]);
-        return ApiResponse::success(['id'=>$id], 201);
+
+        return ApiResponse::success(['id' => $id], 201);
     }
 }

@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
-use App\Models\Page;
 use App\Http\Resources\PageResource;
+use App\Models\Page;
 
 class PageController extends ApiController
 {
@@ -16,4 +17,3 @@ class PageController extends ApiController
         return new PageResource($page);
     }
 }
-

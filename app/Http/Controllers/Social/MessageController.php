@@ -14,7 +14,8 @@ class MessageController extends Controller
     public function index(SafeRoom $room)
     {
         $this->authorizeRoom($room);
-        $items = $room->messages()->with(['from','to'])->latest()->paginate(50);
+        $items = $room->messages()->with(['from', 'to'])->latest()->paginate(50);
+
         return response()->json($items);
     }
 
@@ -22,14 +23,15 @@ class MessageController extends Controller
     {
         $this->authorizeRoom($room);
         $data = $request->validate([
-            'to_user_id' => ['nullable','integer','exists:users,id'],
-            'body' => ['required','string','max:4000'],
-            'meta' => ['array']
+            'to_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'body' => ['required', 'string', 'max:4000'],
+            'meta' => ['array'],
         ]);
         $data['from_user_id'] = Auth::id();
         $data['safe_room_id'] = $room->id;
         $msg = Message::create($data);
         event(new MessageSent($msg));
+
         return response()->json($msg, 201);
     }
 

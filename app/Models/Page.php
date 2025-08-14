@@ -9,10 +9,9 @@ class Page extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = ['title','slug','content','published_at'];
+    protected $fillable = ['title', 'slug', 'content', 'published_at'];
 
     protected $casts = [
         'published_at' => 'datetime',
     ];
 }
-

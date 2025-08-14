@@ -1,11 +1,12 @@
 <?php
+
 namespace App\Http\Middleware;
 
+use App\Support\ApiResponse;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpFoundation\Response;
-use App\Support\ApiResponse;
 
 /**
  * Lightweight role guard without full auth.
@@ -26,39 +27,41 @@ class RequireRole
 
         // User must exist
         $exists = DB::table('users')->where('id', $userId)->exists();
-        if (!$exists) {
+        if (! $exists) {
             return ApiResponse::error('Unauthenticated: user not found', 401);
         }
 
         // If no role required, just pass
-        if (!$roles || count($roles) === 0) {
+        if (! $roles || count($roles) === 0) {
             return $next($request);
         }
 
         // Admin bypass
         $isAdmin = DB::table('role_user')
-            ->join('roles','roles.id','=','role_user.role_id')
+            ->join('roles', 'roles.id', '=', 'role_user.role_id')
             ->where('role_user.user_id', $userId)
             ->where('roles.slug', 'admin')
             ->exists();
         if ($isAdmin) {
             // Inject resolved auth user id into request for downstream usage if needed
             $request->attributes->set('imdc_user_id', $userId);
+
             return $next($request);
         }
 
         // Check any of the required roles
         $allowed = DB::table('role_user')
-            ->join('roles','roles.id','=','role_user.role_id')
+            ->join('roles', 'roles.id', '=', 'role_user.role_id')
             ->where('role_user.user_id', $userId)
             ->whereIn('roles.slug', $roles)
             ->exists();
 
-        if (!$allowed) {
+        if (! $allowed) {
             return ApiResponse::error('Forbidden: insufficient role', 403);
         }
 
         $request->attributes->set('imdc_user_id', $userId);
+
         return $next($request);
     }
 }

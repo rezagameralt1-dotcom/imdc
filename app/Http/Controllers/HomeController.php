@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers;
 
 class HomeController
@@ -8,4 +9,3 @@ class HomeController
         return view('welcome');
     }
 }
-
