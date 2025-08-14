@@ -1,0 +1,23 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use App\Support\Settings;
+
+class Setting extends Model
+{
+    protected $fillable = ['key','value'];
+    public $timestamps = true;
+
+    protected static function booted(): void
+    {
+        static::saved(function () {
+            Settings::forget();
+        });
+        static::deleted(function () {
+            Settings::forget();
+        });
+    }
+}
+

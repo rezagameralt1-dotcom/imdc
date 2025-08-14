@@ -1,0 +1,9 @@
+@extends('layouts.app')
+@section('title','Assets')
+@section('content')
+    <section class="dc-page-head">
+        <h1 class="dc-title">Assets</h1>
+        <p class="dc-muted">مدیریت فایل‌ها (placeholder)</p>
+    </section>
+@endsection
+

@@ -1,0 +1,56 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
+
+/*
+|--------------------------------------------------------------------------
+| UI + Admin pages
+|--------------------------------------------------------------------------
+*/
+Route::view('/ui', 'ui.index')->name('ui');
+Route::prefix('admin')->group(function () {
+    Route::view('/dashboard', 'admin.dashboard')->name('admin.dashboard');
+    Route::view('/users', 'admin.users.index')->name('admin.users');
+    Route::view('/content', 'admin.content.index')->name('admin.content');
+    Route::view('/assets', 'admin.assets.index')->name('admin.assets');
+    Route::view('/settings', 'admin.settings.index')->name('admin.settings');
+});
+
+/*
+|--------------------------------------------------------------------------
+| SPA auth demo (session-based with Sanctum)
+|--------------------------------------------------------------------------
+*/
+Route::post('/test-csrf', fn () => 'csrf ok');
+
+Route::post('/login-spa', function (Request $request) {
+    $credentials = $request->validate([
+        'email'    => ['required', 'email'],
+        'password' => ['required'],
+    ]);
+    if (! Auth::attempt($credentials, true)) {
+        return response()->json(['message' => 'Invalid credentials'], 422);
+    }
+    $request->session()->regenerate();
+    return response()->json(['ok' => true, 'user' => $request->user()]);
+})->name('login.spa');
+
+Route::post('/logout-spa', function (Request $request) {
+    Auth::guard('web')->logout();
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+    return response()->json(['ok' => true]);
+})->name('logout.spa');
+
+Route::get('/me', fn (Request $request) => response()->json($request->user()))->name('me');
+
+/*
+|--------------------------------------------------------------------------
+| Home -> SPA auth demo page (same as before)
+|--------------------------------------------------------------------------
+*/
+Route::view('/', 'welcome')->name('home');
+---
+

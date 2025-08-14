@@ -1,0 +1,22 @@
+<?php
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
+
+class Asset extends Model
+{
+    protected $fillable = ['disk','path','original_name','mime','size','uuid'];
+
+    protected $appends = ['url'];
+
+    public function getUrlAttribute()
+    {
+        try {
+            return Storage::disk($this->disk ?? 'public')->url($this->path);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+}
+

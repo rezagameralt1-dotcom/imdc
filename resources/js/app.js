@@ -1,15 +1,9 @@
-import { createApp, h } from 'vue'
-import { createInertiaApp } from '@inertiajs/vue3'
-import { createPinia } from 'pinia'
+import "./bootstrap";
+import { login, me, logout } from "./lib/auth";
 
-// تم ذخیره‌شده را اعمال کن
-const saved = localStorage.getItem('imdc-theme')
-if (saved) document.documentElement.classList.toggle('dark', saved === 'dark')
+window.spaAuth = { login, me, logout };
+console.log("spaAuth آماده‌ست. نمونه‌ی تست:");
+console.log('await spaAuth.login("test@example.com","secret");');
+console.log("await spaAuth.me();");
+console.log("await spaAuth.logout();");
 
-createInertiaApp({
-  resolve: name => import(`./Pages/${name}.vue`).then(m => m.default),
-  setup({ el, App, props, plugin }) {
-    const app = createApp({ render: () => h(App, props) })
-    app.use(plugin).use(createPinia()).mount(el)
-  },
-})

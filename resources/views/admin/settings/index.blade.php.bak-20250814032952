@@ -1,0 +1,9 @@
+@extends('layouts.app')
+@section('title','Settings')
+@section('content')
+    <section class="dc-page-head">
+        <h1 class="dc-title">Settings</h1>
+        <p class="dc-muted">تنظیمات سامانه (placeholder)</p>
+    </section>
+@endsection
+

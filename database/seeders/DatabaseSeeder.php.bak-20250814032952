@@ -1,0 +1,18 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+
+class DatabaseSeeder extends Seeder
+{
+    public function run(): void
+    {
+        // سایر سیدرهای مورد نیازت را اینجا صدا بزن
+        $this->call([
+            AdminUserSeeder::class,
+        ]);
+    }
+}
+---
+

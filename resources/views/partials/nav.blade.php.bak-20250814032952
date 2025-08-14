@@ -1,0 +1,13 @@
+<header class="dc-nav">
+    <div class="dc-nav__brand">
+        <a href="{{ url('/') }}">DigitalCity</a>
+    </div>
+
+    <nav class="dc-nav__links">
+        <a href="{{ route('ui.index') }}" class="{{ request()->routeIs('ui.*') ? 'is-active' : '' }}">UI</a>
+        <a href="{{ url('/') }}">SPA Auth Demo</a>
+        <a href="{{ route('admin.dashboard') }}" class="{{ request()->routeIs('admin.*') ? 'is-active' : '' }}">Admin</a>
+        <a href="{{ url('/me') }}" title="whoami (JSON)" target="_blank">Me</a>
+    </nav>
+</header>
+

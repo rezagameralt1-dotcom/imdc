@@ -1,0 +1,44 @@
+@extends('layouts.app')
+
+@section('content')
+  <h1>Users</h1>
+  <p class="lead">مدیریت کاربران</p>
+
+  <form class="inline-form" onsubmit="return false;">
+    <input class="input" placeholder="جستجوی کاربر..." />
+    <select class="select">
+      <option>All</option><option>Active</option><option>Disabled</option>
+    </select>
+    <a href="#" class="btn">+ Create</a>
+  </form>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>#</th><th>Name</th><th>Email</th><th>Status</th><th style="width:160px">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>1</td><td>Test User</td><td>test@example.com</td>
+        <td><span class="badge green">Active</span></td>
+        <td class="kit">
+          <a class="btn secondary" href="#">View</a>
+          <a class="btn secondary" href="#">Edit</a>
+          <button class="btn danger">Delete</button>
+        </td>
+      </tr>
+      <tr>
+        <td>2</td><td>Guest</td><td>guest@example.com</td>
+        <td><span class="badge amber">Pending</span></td>
+        <td class="kit">
+          <a class="btn secondary" href="#">View</a>
+          <a class="btn secondary" href="#">Edit</a>
+          <button class="btn danger">Delete</button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+@endsection
+---
+

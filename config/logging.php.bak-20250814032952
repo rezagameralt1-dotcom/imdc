@@ -1,0 +1,48 @@
+<?php
+
+use Monolog\Handler\NullHandler;
+use Monolog\Processor\PsrLogMessageProcessor;
+
+return [
+
+    'default' => env('LOG_CHANNEL', 'daily'),
+
+    'deprecations' => [
+        'channel' => env('LOG_DEPRECATIONS_CHANNEL', 'null'),
+        'trace' => false,
+    ],
+
+    'channels' => [
+        'stack' => [
+            'driver' => 'stack',
+            'channels' => ['daily'],
+            'ignore_exceptions' => false,
+            // Use a tap class (string reference) so config stays serializable
+            'tap' => [App\Logging\PsrMessageProcessorTap::class],
+        ],
+
+        // Log rotator: new file per day, keep 14 days
+        'daily' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAYS', 14),
+            'replace_placeholders' => true,
+            // Also tap here (if channel used directly)
+            'tap' => [App\Logging\PsrMessageProcessorTap::class],
+        ],
+
+        'single' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'replace_placeholders' => true,
+        ],
+
+        'null' => [
+            'driver' => 'monolog',
+            'handler' => NullHandler::class,
+        ],
+    ],
+];
+
