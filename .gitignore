@@ -1,28 +1,22 @@
-# Laravel
-/vendor/
-/node_modules/
-/public/build/
+# Node / PHP / OS
+node_modules/
+vendor/
+.env
+.env.*
+.DS_Store
+Thumbs.db
+*.log
+dist/
+build/
+/storage/*.key
 /public/storage
-/storage
+/public/hot
+/.idea
+/.vscode
+/.fleet
+/.nuxt
+/.next
+/.cache
+*.tmp
+*.bak.*
 
-# Env & caches
-.env
-.env.*.local
-.phpunit.result.cache
-.php-cs-fixer.cache
-
-# IDE & OS
-/.idea/
-/.vscode/
-/*.sqlite
-.DS_Store
-
-# Env local
-.env.local
-# === IMDC additions ===
-/vendor/
-/node_modules/
-/storage/logs/
-/build_release/
-.env
-.DS_Store
