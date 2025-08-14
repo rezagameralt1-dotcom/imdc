@@ -22,3 +22,66 @@ build/
 
 # allow tracking of VS Code settings (override ignore rules if any)
 !.vscode/**
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*
+# === IMDC additions (M05) ===
+/vendor/
+/node_modules/
+/storage/logs/
+/build_release/
+.env
+*.pem
+*project_dump*.txt
+*.bak-*

@@ -1,15 +1,20 @@
 <?php
+declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
+        if (Schema::hasTable('jobs')) {
+            return;
+        }
         Schema::create('jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('queue')->index();
+            $table->bigIncrements('id');
+            $table->string('queue');
             $table->longText('payload');
             $table->unsignedTinyInteger('attempts');
             $table->unsignedInteger('reserved_at')->nullable();
@@ -20,7 +25,7 @@ return new class extends Migration {
 
     public function down(): void
     {
-        Schema::dropIfExists('jobs');
+        // non-destructive; don't drop in shared envs
+        // Schema::dropIfExists('jobs');
     }
 };
-

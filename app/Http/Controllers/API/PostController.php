@@ -1,52 +1,34 @@
 <?php
 namespace App\Http\Controllers\API;
 
-use App\Models\Post;
-use App\Http\Resources\PostResource;
-use App\Http\Requests\StorePostRequest;
-use App\Http\Requests\UpdatePostRequest;
+use App\Http\Controllers\Controller;
+use App\Support\ApiResponse;
+use Illuminate\Support\Facades\DB;
 
-class PostController extends ApiController
+class PostController extends Controller
 {
     public function index()
     {
-        $posts = Post::with(['categories','tags'])->latest()->paginate(12);
-        return PostResource::collection($posts);
+        if (!\Schema::hasTable('posts')) {
+            return ApiResponse::success(['posts' => []]);
+        }
+        $rows = DB::table('posts')->orderByDesc('id')->limit(50)->get();
+        return ApiResponse::success(['posts' => $rows]);
     }
 
-    public function store(StorePostRequest $request)
+    public function store()
     {
-        $post = Post::create($request->validated());
-        if ($request->has('category_ids')) {
-            $post->categories()->sync($request->input('category_ids'));
+        if (!\Schema::hasTable('posts')) {
+            return ApiResponse::error('posts table missing', 400);
         }
-        if ($request->has('tag_ids')) {
-            $post->tags()->sync($request->input('tag_ids'));
-        }
-        return new PostResource($post->load(['categories','tags']));
-    }
-
-    public function show(Post $post)
-    {
-        return new PostResource($post->load(['categories','tags']));
-    }
-
-    public function update(UpdatePostRequest $request, Post $post)
-    {
-        $post->update($request->validated());
-        if ($request->has('category_ids')) {
-            $post->categories()->sync($request->input('category_ids'));
-        }
-        if ($request->has('tag_ids')) {
-            $post->tags()->sync($request->input('tag_ids'));
-        }
-        return new PostResource($post->load(['categories','tags']));
-    }
-
-    public function destroy(Post $post)
-    {
-        $post->delete();
-        return $this->ok(['deleted' => true]);
+        $id = DB::table('posts')->insertGetId([
+            'title' => request('title', 'Untitled'),
+            'summary' => request('summary', null),
+            'content' => request('content', null),
+            'status' => request('status', 'draft'),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        return ApiResponse::success(['id' => $id]);
     }
 }
-

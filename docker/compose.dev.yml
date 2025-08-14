@@ -1,0 +1,55 @@
+version: "3.9"
+services:
+  app:
+    build:
+      context: ./docker/app
+      dockerfile: Dockerfile
+    image: imdc-app:dev
+    container_name: imdc-app
+    volumes:
+      - ..:/var/www/imdc
+    working_dir: /var/www/imdc
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "true"
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_DATABASE: imdc
+      DB_USERNAME: imdc
+      DB_PASSWORD: imdc
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailhog
+      MAIL_PORT: 1025
+      CORS_ALLOW_ORIGIN: http://localhost:5173
+    depends_on:
+      - db
+      - mailhog
+  web:
+    image: nginx:1.25-alpine
+    container_name: imdc-web
+    ports:
+      - "8080:80"
+    volumes:
+      - ..:/var/www/imdc
+      - ./nginx/imdc.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+  db:
+    image: postgres:15-alpine
+    container_name: imdc-db
+    environment:
+      POSTGRES_DB: imdc
+      POSTGRES_USER: imdc
+      POSTGRES_PASSWORD: imdc
+    ports:
+      - "5433:5432"
+    volumes:
+      - imdc_db:/var/lib/postgresql/data
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    container_name: imdc-mailhog
+    ports:
+      - "8025:8025" # UI
+volumes:
+  imdc_db: {}

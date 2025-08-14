@@ -1,24 +1,13 @@
-.PHONY: up down build key perms migrate seed release
+.PHONY: setup serve fresh test
 
-up:
-\tdocker compose up -d --build
+setup:
+	bash scripts/setup.sh
 
-down:
-\tdocker compose down
+serve:
+	php artisan serve --host 127.0.0.1 --port 8000
 
-build:
-\tcomposer install || true
-\tnpm install || true
-\tnpm run build || true
+fresh:
+	php artisan migrate:fresh --seed
 
-key:
-\tdocker compose exec app php artisan key:generate
-
-migrate:
-\tdocker compose exec app php artisan migrate --force
-
-seed:
-\tdocker compose exec app php artisan db:seed --force
-
-release:
-\tbash scripts/release_zip.sh
+test:
+	php artisan test || vendor/bin/phpunit || true

@@ -18,8 +18,8 @@ return new class extends Migration {
             if (Schema::hasColumn('users', 'is_admin')) {
                 $table->dropColumn('is_admin');
             }
+        
+
         });
     }
 };
----
-
