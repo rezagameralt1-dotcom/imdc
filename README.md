@@ -7,3 +7,7 @@
   php artisan serve --host 127.0.0.1 --port 8000
 
 تست Smart Commit
+
+
+
+تست VS Code auto-push
