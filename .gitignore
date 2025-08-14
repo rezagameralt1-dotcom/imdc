@@ -16,3 +16,6 @@
 /.vscode/
 /*.sqlite
 .DS_Store
+
+# Env local
+.env.local
