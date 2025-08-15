@@ -1,5 +1,19 @@
 <?php
 
+// --- IMDC_AUTOBOT: healthz ---
+use Illuminate\Support\Facades\Route;
+
+if (! function_exists('imdc_healthz_defined')) {
+    function imdc_healthz_defined()
+    {
+        return true;
+    }
+    Route::get('/healthz', function () {
+        return response('HEALTH OK', 200);
+    })->name('healthz');
+}
+// --- /IMDC_AUTOBOT ---
+
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
