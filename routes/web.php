@@ -1,5 +1,13 @@
 <?php
 
+// --- IMDC_AUTOBOT: login placeholder ---
+use Illuminate\Support\Facades\Route;
+
+Route::get('/login', function () {
+    return response('LOGIN OK', 200);
+})->name('login');
+// --- /IMDC_AUTOBOT ---
+
 // --- IMDC_AUTOBOT: healthz ---
 use Illuminate\Support\Facades\Route;
 
