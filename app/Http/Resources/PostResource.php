@@ -14,9 +14,8 @@ class PostResource extends JsonResource
             'slug' => $this->slug,
             'excerpt' => $this->excerpt,
             'published_at' => optional($this->published_at)->toIso8601String(),
-            'categories' => $this->whenLoaded('categories', fn() => $this->categories->pluck('name')->all()),
-            'tags' => $this->whenLoaded('tags', fn() => $this->tags->pluck('name')->all()),
+            'categories' => $this->whenLoaded('categories', fn () => $this->categories->pluck('name')->all()),
+            'tags' => $this->whenLoaded('tags', fn () => $this->tags->pluck('name')->all()),
         ];
     }
 }
-

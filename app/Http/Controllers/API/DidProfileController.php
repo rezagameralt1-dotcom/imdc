@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -10,10 +11,13 @@ class DidProfileController extends Controller
 {
     public function index(Request $request)
     {
-        $q = DB::table('did_profiles')->select('id','user_id','did','credentials','created_at','updated_at');
-        if ($uid = $request->query('user_id')) $q->where('user_id', (int)$uid);
+        $q = DB::table('did_profiles')->select('id', 'user_id', 'did', 'credentials', 'created_at', 'updated_at');
+        if ($uid = $request->query('user_id')) {
+            $q->where('user_id', (int) $uid);
+        }
         $q->orderByDesc('id');
-        return ApiResponse::success($q->paginate(min((int)$request->query('per_page',20),100)));
+
+        return ApiResponse::success($q->paginate(min((int) $request->query('per_page', 20), 100)));
     }
 
     public function store(Request $request)
@@ -30,23 +34,29 @@ class DidProfileController extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
-        return ApiResponse::success(['id'=>$id], 201);
+
+        return ApiResponse::success(['id' => $id], 201);
     }
 
     public function update(Request $request, int $id)
     {
-        $exists = DB::table('did_profiles')->where('id',$id)->exists();
-        if (!$exists) return ApiResponse::error('DID profile not found', 404);
+        $exists = DB::table('did_profiles')->where('id', $id)->exists();
+        if (! $exists) {
+            return ApiResponse::error('DID profile not found', 404);
+        }
 
         $data = $request->validate([
             'credentials' => 'nullable|array',
         ]);
         $payload = [];
-        if (array_key_exists('credentials', $data)) $payload['credentials'] = json_encode($data['credentials']);
+        if (array_key_exists('credentials', $data)) {
+            $payload['credentials'] = json_encode($data['credentials']);
+        }
         if ($payload) {
             $payload['updated_at'] = now();
-            DB::table('did_profiles')->where('id',$id)->update($payload);
+            DB::table('did_profiles')->where('id', $id)->update($payload);
         }
-        return ApiResponse::success(['id'=>$id]);
+
+        return ApiResponse::success(['id' => $id]);
     }
 }

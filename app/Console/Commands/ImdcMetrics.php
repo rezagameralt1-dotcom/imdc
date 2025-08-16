@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
@@ -12,6 +13,7 @@ use Illuminate\Support\Facades\Schema;
 class ImdcMetrics extends Command
 {
     protected $signature = 'imdc:metrics {--output= : If set, write to this path}';
+
     protected $description = 'Emit Prometheus metrics (text format)';
 
     public function handle(): int
@@ -35,12 +37,12 @@ class ImdcMetrics extends Command
 
         $lines[] = '# HELP imdc_db_table_rows Row counts of key tables';
         $lines[] = '# TYPE imdc_db_table_rows gauge';
-        foreach (['users','orders','products'] as $t) {
+        foreach (['users', 'orders', 'products'] as $t) {
             $count = (Schema::hasTable($t)) ? (int) DB::table($t)->count() : 0;
             $lines[] = sprintf('imdc_db_table_rows{table="%s"} %d', $t, $count);
         }
 
-        $text = implode("\n", $lines) . "\n";
+        $text = implode("\n", $lines)."\n";
 
         if ($path = $this->option('output')) {
             file_put_contents($path, $text);
@@ -48,6 +50,7 @@ class ImdcMetrics extends Command
         } else {
             $this->line($text);
         }
+
         return self::SUCCESS;
     }
 }

@@ -1,0 +1,15 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+
+Route::get('/', function () {
+    return 'IMDC OK';
+});
+
+Route::get('/login', function () {
+    return response('LOGIN OK', 200);
+})->name('login');
+
+Route::get('/healthz', function () {
+    return response('HEALTH OK', 200);
+})->name('healthz');

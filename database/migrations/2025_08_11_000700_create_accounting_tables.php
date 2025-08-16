@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('accounts')) {
+        if (! Schema::hasTable('accounts')) {
             Schema::create('accounts', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('user_id')->nullable();
@@ -18,7 +20,7 @@ return new class extends Migration {
                 $t->foreign('user_id')->references('id')->on('users')->nullOnDelete();
             });
         }
-        if (!Schema::hasTable('vouchers')) {
+        if (! Schema::hasTable('vouchers')) {
             Schema::create('vouchers', function (Blueprint $t) {
                 $t->id();
                 $t->string('no')->unique();
@@ -26,7 +28,7 @@ return new class extends Migration {
                 $t->timestamps();
             });
         }
-        if (!Schema::hasTable('audit_logs')) {
+        if (! Schema::hasTable('audit_logs')) {
             Schema::create('audit_logs', function (Blueprint $t) {
                 $t->id();
                 $t->string('event');

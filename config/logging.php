@@ -1,9 +1,6 @@
 <?php
 
 use Monolog\Handler\NullHandler;
-use Monolog\Handler\StreamHandler;
-use Monolog\Handler\SyslogUdp\UdpSocket;
-use Monolog\Handler\SyslogUdpHandler;
 use Monolog\Processor\PsrLogMessageProcessor;
 
 return [
@@ -16,11 +13,18 @@ return [
     ],
 
     'channels' => [
+        'imdc' => [
+            'driver' => 'single',
+            'path' => storage_path('logs/laravel.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'tap' => [App\Logging\CustomizeFormatter::class],
+        ],
+
         'stack' => [
             'driver' => 'stack',
             'channels' => ['daily'],
             'ignore_exceptions' => false,
-            'processors' => [new PsrLogMessageProcessor()],
+            'processors' => [new PsrLogMessageProcessor],
         ],
 
         // Log rotator: new file per day, keep 14 days
@@ -45,4 +49,3 @@ return [
         ],
     ],
 ];
-

@@ -1,0 +1,40 @@
+RUN bash <<'SH'
+set -euo pipefail
+cd /var/www/imdc
+
+MIG='database/migrations/2025_08_11_001100_harden_constraints.php'
+[ -f "$MIG" ] || { echo "Missing $MIG"; exit 0; }
+cp -a "$MIG" "$MIG.bak.$(date +%F_%H%M%S)"
+
+php -d detect_unicode=0 -r '
+$path = "database/migrations/2025_08_11_001100_harden_constraints.php";
+$c = file_get_contents($path);
+if ($c === false) { fwrite(STDERR, "read fail\n"); exit(1); }
+
+/* 1) ensure "use Illuminate\Support\Facades\DB;" exists */
+if (!preg_match("/^use\\s+Illuminate\\\\\\\\Support\\\\\\\\Facades\\\\\\\\DB\\s*;/m", $c)) {
+    if (preg_match("/^<\\?php\\s*(?:namespace\\s+[^;]+;\\s*)?/m", $c, $m, PREG_OFFSET_CAPTURE)) {
+        $pos = $m[0][1] + strlen($m[0][0]);
+        $c = substr($c, 0, $pos) . "\nuse Illuminate\\Support\\Facades\\DB;\n" . substr($c, $pos);
+    } else {
+        $c = "<?php\nuse Illuminate\\Support\\Facades\\DB;\n" . ltrim($c, "<?php");
+    }
+}
+
+/* 2) add guard at start of up() only once */
+if (!preg_match("/DB::getDriverName\\(\\)\\s*===\\s*[\\\"\\\']sqlite[\\\"\\\']/", $c)) {
+    $c = preg_replace(
+        "/function\\s+up\\s*\\(\\)\\s*\\{/",
+        "function up()\n    {\n        if (DB::getDriverName() === \'sqlite\') {\n            echo \"[migration] skip harden_constraints on sqlite\\n\";\n            return;\n        }\n",
+        $c,
+        1
+    );
+}
+
+file_put_contents($path, $c);
+echo "Patched: $path\n";
+'
+
+php -l "$MIG" || true
+echo "Done."
+SH

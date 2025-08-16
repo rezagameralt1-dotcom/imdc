@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Category;
 use App\Models\Post;
 use App\Models\PostSlug;
-use App\Models\Category;
 use App\Models\Tag;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -19,22 +19,22 @@ class PostController extends Controller
 
         $q = trim((string) $request->get('q', ''));
         $status = $request->get('status');
-        $sort = in_array($request->get('sort'), ['id','title','published_at','status']) ? $request->get('sort') : 'id';
-        $dir  = $request->get('dir') === 'asc' ? 'asc' : 'desc';
+        $sort = in_array($request->get('sort'), ['id', 'title', 'published_at', 'status']) ? $request->get('sort') : 'id';
+        $dir = $request->get('dir') === 'asc' ? 'asc' : 'desc';
 
         $posts = Post::with('author')
             ->when($q !== '', function ($query) use ($q) {
                 $query->where(function ($w) use ($q) {
                     $w->where('title', 'like', "%$q%")
-                      ->orWhere('excerpt', 'like', "%$q%");
+                        ->orWhere('excerpt', 'like', "%$q%");
                 });
             })
-            ->when($status, fn($qq) => $qq->where('status',$status))
+            ->when($status, fn ($qq) => $qq->where('status', $status))
             ->orderBy($sort, $dir)
             ->paginate(15)
             ->withQueryString();
 
-        return view('admin.content.posts.index', compact('posts','q','status','sort','dir'));
+        return view('admin.content.posts.index', compact('posts', 'q', 'status', 'sort', 'dir'));
     }
 
     public function create()
@@ -43,7 +43,8 @@ class PostController extends Controller
 
         $categories = Category::orderBy('name')->get();
         $allTags = Tag::orderBy('name')->pluck('name')->implode(', ');
-        return view('admin.content.posts.create', compact('categories','allTags'));
+
+        return view('admin.content.posts.create', compact('categories', 'allTags'));
     }
 
     public function store(Request $request)
@@ -51,20 +52,20 @@ class PostController extends Controller
         $this->authorize('create', Post::class);
 
         $data = $request->validate([
-            'title' => ['required','string','max:200'],
-            'excerpt' => ['nullable','string','max:500'],
-            'body' => ['nullable','string'],
-            'status' => ['required', Rule::in(['draft','published','archived'])],
-            'published_at' => ['nullable','date'],
-            'categories' => ['nullable','array'],
-            'categories.*' => ['integer','exists:categories,id'],
-            'tags' => ['nullable','string'],
+            'title' => ['required', 'string', 'max:200'],
+            'excerpt' => ['nullable', 'string', 'max:500'],
+            'body' => ['nullable', 'string'],
+            'status' => ['required', Rule::in(['draft', 'published', 'archived'])],
+            'published_at' => ['nullable', 'date'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['integer', 'exists:categories,id'],
+            'tags' => ['nullable', 'string'],
         ]);
 
         $slug = Str::slug($data['title']);
         $base = $slug;
         $i = 1;
-        while (Post::where('slug',$slug)->exists()) {
+        while (Post::where('slug', $slug)->exists()) {
             $slug = $base.'-'.(++$i);
         }
 
@@ -81,7 +82,7 @@ class PostController extends Controller
         $post->categories()->sync($data['categories'] ?? []);
 
         $tagIds = [];
-        if (!empty($data['tags'])) {
+        if (! empty($data['tags'])) {
             $names = array_filter(array_map('trim', explode(',', $data['tags'])));
             foreach ($names as $name) {
                 $tag = Tag::firstOrCreate(['name' => $name]);
@@ -90,7 +91,7 @@ class PostController extends Controller
         }
         $post->tags()->sync($tagIds);
 
-        return redirect()->route('admin.content.posts.index')->with('ok','پست ایجاد شد.');
+        return redirect()->route('admin.content.posts.index')->with('ok', 'پست ایجاد شد.');
     }
 
     public function edit(Post $post)
@@ -100,7 +101,8 @@ class PostController extends Controller
         $categories = Category::orderBy('name')->get();
         $selectedCats = $post->categories()->pluck('categories.id')->toArray();
         $tags = $post->tags()->pluck('name')->implode(', ');
-        return view('admin.content.posts.edit', compact('post','categories','selectedCats','tags'));
+
+        return view('admin.content.posts.edit', compact('post', 'categories', 'selectedCats', 'tags'));
     }
 
     public function update(Request $request, Post $post)
@@ -108,14 +110,14 @@ class PostController extends Controller
         $this->authorize('update', $post);
 
         $data = $request->validate([
-            'title' => ['required','string','max:200'],
-            'excerpt' => ['nullable','string','max:500'],
-            'body' => ['nullable','string'],
-            'status' => ['required', Rule::in(['draft','published','archived'])],
-            'published_at' => ['nullable','date'],
-            'categories' => ['nullable','array'],
-            'categories.*' => ['integer','exists:categories,id'],
-            'tags' => ['nullable','string'],
+            'title' => ['required', 'string', 'max:200'],
+            'excerpt' => ['nullable', 'string', 'max:500'],
+            'body' => ['nullable', 'string'],
+            'status' => ['required', Rule::in(['draft', 'published', 'archived'])],
+            'published_at' => ['nullable', 'date'],
+            'categories' => ['nullable', 'array'],
+            'categories.*' => ['integer', 'exists:categories,id'],
+            'tags' => ['nullable', 'string'],
         ]);
 
         $newSlug = $post->slug;
@@ -123,12 +125,12 @@ class PostController extends Controller
             $slug = \Illuminate\Support\Str::slug($data['title']);
             $base = $slug;
             $i = 1;
-            while (Post::where('slug',$slug)->where('id','!=',$post->id)->exists()) {
+            while (Post::where('slug', $slug)->where('id', '!=', $post->id)->exists()) {
                 $slug = $base.'-'.(++$i);
             }
             if ($slug !== $post->slug) {
                 // Keep old slug for redirect
-                PostSlug::firstOrCreate(['post_id'=>$post->id, 'slug'=>$post->slug]);
+                PostSlug::firstOrCreate(['post_id' => $post->id, 'slug' => $post->slug]);
                 $newSlug = $slug;
             }
         }
@@ -145,7 +147,7 @@ class PostController extends Controller
         $post->categories()->sync($data['categories'] ?? []);
 
         $tagIds = [];
-        if (!empty($data['tags'])) {
+        if (! empty($data['tags'])) {
             $names = array_filter(array_map('trim', explode(',', $data['tags'])));
             foreach ($names as $name) {
                 $tag = Tag::firstOrCreate(['name' => $name]);
@@ -154,7 +156,7 @@ class PostController extends Controller
         }
         $post->tags()->sync($tagIds);
 
-        return redirect()->route('admin.content.posts.index')->with('ok','پست به‌روزرسانی شد.');
+        return redirect()->route('admin.content.posts.index')->with('ok', 'پست به‌روزرسانی شد.');
     }
 
     public function destroy(Post $post)
@@ -162,7 +164,7 @@ class PostController extends Controller
         $this->authorize('delete', $post);
 
         $post->delete();
+
         return back()->with('ok','پست حذف شد.');
     }
 }
-

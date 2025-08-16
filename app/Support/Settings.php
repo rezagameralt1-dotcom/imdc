@@ -21,4 +21,3 @@ class Settings
         Cache::forget('settings.all');
     }
 }
-

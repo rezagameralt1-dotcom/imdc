@@ -1,4 +1,5 @@
 <?php
+
 namespace Database\Seeders;
 
 use App\Support\FeatureFlags;
@@ -11,10 +12,10 @@ class FeatureFlagSeeder extends Seeder
         // Seed from ENV fallbacks if present
         $features = [
             'EXCHANGE' => env('FEATURE_EXCHANGE', null),
-            'VR_TOUR'  => env('FEATURE_VR_TOUR', null),
-            'MEZON'    => env('FEATURE_MEZON', null),
-            'DAO'      => env('FEATURE_DAO', null),
-            'PHARMA'   => env('FEATURE_PHARMA', null),
+            'VR_TOUR' => env('FEATURE_VR_TOUR', null),
+            'MEZON' => env('FEATURE_MEZON', null),
+            'DAO' => env('FEATURE_DAO', null),
+            'PHARMA' => env('FEATURE_PHARMA', null),
         ];
         foreach ($features as $key => $envVal) {
             if ($envVal !== null) {

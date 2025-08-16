@@ -9,6 +9,7 @@ use ZipArchive;
 class BackupLocal extends Command
 {
     protected $signature = 'digitalcity:backup:local {--keep=10 : Keep last N backup files}';
+
     protected $description = 'Create a lightweight zip backup of public storage and key app files (local/dev use).';
 
     public function handle(): int
@@ -18,11 +19,12 @@ class BackupLocal extends Command
         if (! is_dir($backupDir)) {
             @mkdir($backupDir, 0775, true);
         }
-        $zipPath = $backupDir . DIRECTORY_SEPARATOR . "backup-{$ts}.zip";
+        $zipPath = $backupDir.DIRECTORY_SEPARATOR."backup-{$ts}.zip";
 
-        $zip = new ZipArchive();
+        $zip = new ZipArchive;
         if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            $this->error('Cannot create zip at: ' . $zipPath);
+            $this->error('Cannot create zip at: '.$zipPath);
+
             return self::FAILURE;
         }
 
@@ -46,7 +48,7 @@ class BackupLocal extends Command
 
         // Keep last N
         $keep = (int) $this->option('keep');
-        $files = collect(glob($backupDir . DIRECTORY_SEPARATOR + '*backup-*.zip')).sort();
+        $files = collect(glob($backupDir.DIRECTORY_SEPARATOR + '*backup-*.zip')).sort();
         if ($files->count() > $keep) {
             foreach ($files->slice(0, $files->count() - $keep) as $f) {
                 @unlink($f);
@@ -64,13 +66,12 @@ class BackupLocal extends Command
         );
 
         foreach ($iterator as $file) {
-            $localName = $base . DIRECTORY_SEPARATOR . ltrim(str_replace($path, '', $file->getPathname()), DIRECTORY_SEPARATOR);
+            $localName = $base.DIRECTORY_SEPARATOR.ltrim(str_replace($path, '', $file->getPathname()), DIRECTORY_SEPARATOR);
             if ($file->isDir()) {
-                $zip->addEmptyDir(str_replace('\\','/',$localName));
+                $zip->addEmptyDir(str_replace('\\', '/', $localName));
             } else {
-                $zip->addFile($file->getPathname(), str_replace('\\','/',$localName));
+                $zip->addFile($file->getPathname(), str_replace('\\', '/', $localName));
             }
         }
     }
 }
-

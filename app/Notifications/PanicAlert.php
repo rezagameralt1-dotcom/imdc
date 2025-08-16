@@ -3,8 +3,8 @@
 namespace App\Notifications;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Notifications\Notification;
 use Illuminate\Notifications\Messages\MailMessage;
+use Illuminate\Notifications\Notification;
 
 class PanicAlert extends Notification
 {
@@ -22,7 +22,7 @@ class PanicAlert extends Notification
         return (new MailMessage)
             ->subject('Panic Alert')
             ->line('Panic code was triggered.')
-            ->line('User: ' . $this->userEmail)
-            ->line('Time: ' . $this->timeIso);
+            ->line('User: '.$this->userEmail)
+            ->line('Time: '.$this->timeIso);
     }
 }

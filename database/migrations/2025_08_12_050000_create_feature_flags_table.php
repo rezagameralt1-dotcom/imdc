@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -9,7 +10,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (!Schema::hasTable('feature_flags')) {
+        if (! Schema::hasTable('feature_flags')) {
             Schema::create('feature_flags', function (Blueprint $table) {
                 $table->id();
                 $table->string('key')->unique();   // e.g. EXCHANGE, DAO, VR_TOUR

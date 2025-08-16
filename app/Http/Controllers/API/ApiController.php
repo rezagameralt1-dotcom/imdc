@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
-use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Routing\Controller as BaseController;
 
 class ApiController extends BaseController
 {
@@ -16,4 +17,3 @@ class ApiController extends BaseController
         return response()->json($data, $status);
     }
 }
-

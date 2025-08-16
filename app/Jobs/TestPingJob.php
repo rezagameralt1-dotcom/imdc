@@ -25,4 +25,3 @@ class TestPingJob implements ShouldQueue
         Log::info('[TestPingJob] '.$this->msg);
     }
 }
-

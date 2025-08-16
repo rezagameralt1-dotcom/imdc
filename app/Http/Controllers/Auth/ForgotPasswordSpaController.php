@@ -10,7 +10,7 @@ class ForgotPasswordSpaController extends Controller
 {
     public function send(Request $request)
     {
-        $request->validate(['email' => ['required','email']]);
+        $request->validate(['email' => ['required', 'email']]);
 
         $status = Password::sendResetLink($request->only('email'));
 
@@ -19,4 +19,3 @@ class ForgotPasswordSpaController extends Controller
             : response()->json(['ok' => false, 'message' => __($status)], 422);
     }
 }
-

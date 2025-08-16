@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
@@ -11,6 +12,7 @@ class OrderStatusChanged extends Mailable implements ShouldQueue
     use Queueable, SerializesModels;
 
     public int $orderId;
+
     public string $status;
 
     public function __construct(int $orderId, string $status)

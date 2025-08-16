@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -17,6 +18,7 @@ class OpenApiController extends Controller
                 '/api/health/ready' => ['get' => ['summary' => 'Readiness', 'responses' => ['200' => ['description' => 'OK']]]],
             ],
         ];
+
         return response()->json($spec);
     }
 }

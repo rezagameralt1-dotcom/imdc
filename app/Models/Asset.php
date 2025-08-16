@@ -10,7 +10,6 @@ class Asset extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'disk','path','filename','mime','size','user_id'
+        'disk', 'path', 'filename', 'mime', 'size', 'user_id',
     ];
 }
-

@@ -3,9 +3,8 @@ namespace App\Http\Controllers;
 
 class HomeController
 {
-    public function index()
+    public function __invoke()
     {
         return view('welcome');
     }
 }
-

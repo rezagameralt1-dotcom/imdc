@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\User;
-use App\Models\Post;
 use App\Models\Asset;
+use App\Models\Post;
+use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 
 class DashboardController extends Controller
@@ -14,7 +14,7 @@ class DashboardController extends Controller
     {
         $userCount = User::count();
         $postCount = Post::count();
-        $postPublished = Post::where('status','published')->count();
+        $postPublished = Post::where('status', 'published')->count();
         $assetCount = class_exists(Asset::class) ? Asset::count() : 0;
 
         $size = 0;
@@ -24,7 +24,6 @@ class DashboardController extends Controller
             }
         }
 
-        return view('admin.dashboard', compact('userCount','postCount','postPublished','assetCount','size'));
+        return view('admin.dashboard', compact('userCount', 'postCount', 'postPublished', 'assetCount', 'size'));
     }
 }
-

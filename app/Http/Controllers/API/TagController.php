@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
-use App\Models\Tag;
 use App\Http\Resources\TagResource;
+use App\Models\Tag;
 
 class TagController extends ApiController
 {
@@ -16,4 +17,3 @@ class TagController extends ApiController
         return new TagResource($tag);
     }
 }
-

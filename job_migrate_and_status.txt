@@ -1,0 +1,6 @@
+RUN bash <<'SH'
+set -euo pipefail
+cd /var/www/imdc
+php artisan migrate --force || true
+php artisan migrate:status
+SH

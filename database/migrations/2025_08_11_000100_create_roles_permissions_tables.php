@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('roles')) {
+        if (! Schema::hasTable('roles')) {
             Schema::create('roles', function (Blueprint $t) {
                 $t->id();
                 $t->string('name', 80);
@@ -16,7 +18,7 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('permissions')) {
+        if (! Schema::hasTable('permissions')) {
             Schema::create('permissions', function (Blueprint $t) {
                 $t->id();
                 $t->string('name', 120);
@@ -24,21 +26,21 @@ return new class extends Migration {
             });
         }
 
-        if (!Schema::hasTable('role_user')) {
+        if (! Schema::hasTable('role_user')) {
             Schema::create('role_user', function (Blueprint $t) {
                 $t->unsignedBigInteger('role_id');
                 $t->unsignedBigInteger('user_id');
-                $t->primary(['role_id','user_id']);
+                $t->primary(['role_id', 'user_id']);
                 $t->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
                 $t->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             });
         }
 
-        if (!Schema::hasTable('permission_role')) {
+        if (! Schema::hasTable('permission_role')) {
             Schema::create('permission_role', function (Blueprint $t) {
                 $t->unsignedBigInteger('permission_id');
                 $t->unsignedBigInteger('role_id');
-                $t->primary(['permission_id','role_id']);
+                $t->primary(['permission_id', 'role_id']);
                 $t->foreign('permission_id')->references('id')->on('permissions')->cascadeOnDelete();
                 $t->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
             });

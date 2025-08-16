@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Observers;
 
 use App\Models\Inventory;
@@ -13,11 +14,11 @@ class OrderItemObserver
         DB::transaction(function () use ($item) {
             // Lock inventory row
             $inv = Inventory::where('product_id', $item->product_id)->lockForUpdate()->first();
-            if (!$inv) {
+            if (! $inv) {
                 throw new RuntimeException("Inventory for product {$item->product_id} not found.");
             }
             if ($item->qty <= 0) {
-                throw new RuntimeException("Order item qty must be > 0.");
+                throw new RuntimeException('Order item qty must be > 0.');
             }
             if ($inv->stock < $item->qty) {
                 throw new RuntimeException("Insufficient stock for product {$item->product_id}.");
@@ -44,10 +45,12 @@ class OrderItemObserver
             // Get original qty before update
             $originalQty = $item->getOriginal('qty') ?? 0;
             $delta = ($item->qty ?? 0) - $originalQty;
-            if ($delta === 0) return;
+            if ($delta === 0) {
+                return;
+            }
 
             $inv = Inventory::where('product_id', $item->product_id)->lockForUpdate()->first();
-            if (!$inv) {
+            if (! $inv) {
                 throw new RuntimeException("Inventory for product {$item->product_id} not found.");
             }
 
@@ -89,7 +92,7 @@ class OrderItemObserver
                 ->value('total');
 
             DB::table('orders')->where('id', $orderId)->update([
-                'total' => (int)$sum,
+                'total' => (int) $sum,
                 'updated_at' => now(),
             ]);
         });

@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Middleware;
 
 use Closure;
@@ -14,8 +15,12 @@ class PaginationDefaults
 
         // Normalize per_page in query string
         $per = (int) $request->query('per_page', $default);
-        if ($per <= 0) $per = $default;
-        if ($per > $max) $per = $max;
+        if ($per <= 0) {
+            $per = $default;
+        }
+        if ($per > $max) {
+            $per = $max;
+        }
 
         // Mutate query for downstream paginators
         $request->query->set('per_page', $per);

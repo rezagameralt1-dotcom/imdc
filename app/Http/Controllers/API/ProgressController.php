@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
@@ -12,7 +13,8 @@ class ProgressController extends Controller
         // Invoke the command and capture JSON
         Artisan::call('imdc:progress', ['--json' => true]);
         $json = Artisan::output();
-        $data = json_decode($json, true) ?: ['percent'=>0,'error'=>'failed to parse progress'];
+        $data = json_decode($json, true) ?: ['percent' => 0, 'error' => 'failed to parse progress'];
+
         return ApiResponse::success($data);
     }
 }

@@ -7,6 +7,7 @@ use Illuminate\Console\Command;
 class CacheAll extends Command
 {
     protected $signature = 'digitalcity:cache:all';
+
     protected $description = 'Warm all caches: config, route, view.';
 
     public function handle(): int
@@ -19,7 +20,7 @@ class CacheAll extends Command
         $this->call('view:cache');
 
         $this->info('All caches warmed.');
+
         return self::SUCCESS;
     }
 }
-

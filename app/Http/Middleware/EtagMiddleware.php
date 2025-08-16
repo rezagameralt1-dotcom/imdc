@@ -14,7 +14,7 @@ class EtagMiddleware
         $response = $next($request);
 
         if ($request->isMethod('GET') && $response->getStatusCode() === 200 && $response->headers->get('ETag') === null) {
-            $etag = '"' . md5($response->getContent()) . '"';
+            $etag = '"'.md5($response->getContent()).'"';
             $response->headers->set('ETag', $etag);
 
             $ifNoneMatch = $request->headers->get('If-None-Match');
@@ -26,4 +26,3 @@ class EtagMiddleware
         return $response;
     }
 }
-

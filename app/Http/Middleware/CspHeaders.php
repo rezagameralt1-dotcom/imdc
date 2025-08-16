@@ -17,9 +17,9 @@ class CspHeaders
         $vite = $host.':5173';
 
         $scriptSrc = "'self' 'unsafe-inline' https://unpkg.com".($dev ? " http://$vite" : '');
-        $styleSrc  = "'self' 'unsafe-inline' https://unpkg.com";
-        $imgSrc    = "'self' data: blob:";
-        $connect   = "'self'".($dev ? " http://$vite ws://$vite" : '');
+        $styleSrc = "'self' 'unsafe-inline' https://unpkg.com";
+        $imgSrc = "'self' data: blob:";
+        $connect = "'self'".($dev ? " http://$vite ws://$vite" : '');
 
         $csp = "default-src 'self'; script-src $scriptSrc; style-src $styleSrc; img-src $imgSrc; font-src 'self' data:; connect-src $connect; frame-ancestors 'none';";
         $resp->headers->set('Content-Security-Policy', $csp);
@@ -27,4 +27,3 @@ class CspHeaders
         return $resp;
     }
 }
-

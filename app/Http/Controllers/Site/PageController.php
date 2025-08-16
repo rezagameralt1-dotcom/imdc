@@ -10,7 +10,7 @@ class PageController extends Controller
     public function show(string $slug)
     {
         $page = Page::where('slug', $slug)->firstOrFail();
+
         return view('site.pages.show', compact('page'));
     }
 }
-

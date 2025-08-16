@@ -1,14 +1,16 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration {
+return new class extends Migration
+{
     public function up(): void
     {
-        if (!Schema::hasTable('courses')) {
+        if (! Schema::hasTable('courses')) {
             Schema::create('courses', function (Blueprint $t) {
                 $t->id();
                 $t->string('title');
@@ -18,7 +20,7 @@ return new class extends Migration {
                 $t->foreign('teacher_id')->references('id')->on('users')->nullOnDelete();
             });
         }
-        if (!Schema::hasTable('classes')) {
+        if (! Schema::hasTable('classes')) {
             Schema::create('classes', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('course_id');
@@ -27,18 +29,18 @@ return new class extends Migration {
                 $t->foreign('course_id')->references('id')->on('courses')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('enrollments')) {
+        if (! Schema::hasTable('enrollments')) {
             Schema::create('enrollments', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('class_id');
                 $t->unsignedBigInteger('user_id');
                 $t->timestamps();
-                $t->unique(['class_id','user_id']);
+                $t->unique(['class_id', 'user_id']);
                 $t->foreign('class_id')->references('id')->on('classes')->cascadeOnDelete();
                 $t->foreign('user_id')->references('id')->on('users')->cascadeOnDelete();
             });
         }
-        if (!Schema::hasTable('skill_nfts')) {
+        if (! Schema::hasTable('skill_nfts')) {
             Schema::create('skill_nfts', function (Blueprint $t) {
                 $t->id();
                 $t->unsignedBigInteger('user_id');

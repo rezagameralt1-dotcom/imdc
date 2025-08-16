@@ -10,14 +10,14 @@ class LogController extends Controller
 {
     public function index(Request $request)
     {
-        $q = trim((string) $request->get('q',''));
-        $logs = AdminActivityLog::when($q !== '', function($qr) use ($q){
-                $qr->where('action','like',"%$q%");
-            })
+        $q = trim((string) $request->get('q', ''));
+        $logs = AdminActivityLog::when($q !== '', function ($qr) use ($q) {
+            $qr->where('action', 'like', "%$q%");
+        })
             ->orderByDesc('id')
             ->paginate(25)
             ->withQueryString();
-        return view('admin.logs.index', compact('logs','q'));
+
+        return view('admin.logs.index', compact('logs', 'q'));
     }
 }
-

@@ -1,9 +1,0 @@
-@extends('layouts.app')
-@section('title','Content')
-@section('content')
-    <section class="dc-page-head">
-        <h1 class="dc-title">Content</h1>
-        <p class="dc-muted">مدیریت محتوا (placeholder)</p>
-    </section>
-@endsection
-

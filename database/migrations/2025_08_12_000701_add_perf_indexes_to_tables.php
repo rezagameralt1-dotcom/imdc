@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 use Illuminate\Database\Migrations\Migration;
@@ -13,15 +14,16 @@ return new class extends Migration
         if (strlen($name) > 63) {
             $name = substr($name, 0, 63);
         }
+
         return $name;
     }
 
     private function createIndex(string $table, string $column, ?string $name = null): void
     {
-        if (!Schema::hasTable($table)) {
+        if (! Schema::hasTable($table)) {
             throw new RuntimeException("Table '{$table}' does not exist for indexing.");
         }
-        if (!Schema::hasColumn($table, $column)) {
+        if (! Schema::hasColumn($table, $column)) {
             throw new RuntimeException("Column '{$table}.{$column}' does not exist for indexing.");
         }
 
