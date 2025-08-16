@@ -1,0 +1,41 @@
+RUN bash <<'SH'
+set -euo pipefail
+cd /var/www/imdc
+
+PORT=8199
+HOST=127.0.0.1
+DOCROOT="public"
+
+# free port
+(command -v fuser >/dev/null 2>&1 && fuser -k ${PORT}/tcp 2>/dev/null) || true
+if command -v lsof >/dev/null 2>&1; then
+  pid="$(lsof -t -iTCP:${PORT} -sTCP:LISTEN 2>/dev/null || true)"
+  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+fi
+
+# php -S
+php -S ${HOST}:${PORT} -t "${DOCROOT}" >/tmp/php${PORT}.log 2>&1 & echo $! >/tmp/php${PORT}.pid
+
+# wait up to 30s
+i=0
+while [ $i -lt 30 ]; do
+  curl -s "http://${HOST}:${PORT}/healthz" >/dev/null && break
+  curl -s "http://${HOST}:${PORT}/" >/dev/null && break
+  i=$((i+1)); sleep 1
+done
+
+ok=1
+for p in /healthz / /login; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://${HOST}:${PORT}${p}" || echo 000)
+  echo "[SMOKE] $p -> $code"
+  case "$code" in 2*|3*) : ;; *) ok=0 ;; esac
+done
+
+# cleanup
+if [ -f "/tmp/php${PORT}.pid" ]; then
+  kill "$(cat /tmp/php${PORT}.pid)" 2>/dev/null || true
+  rm -f "/tmp/php${PORT}.pid"
+fi
+
+exit $ok
+SH

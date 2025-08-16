@@ -14,6 +14,11 @@ use Illuminate\Support\Facades\Schema;
  */
 return new class extends Migration
 {
+    private function isSqlite(): bool
+    {
+        return DB::getDriverName() === 'sqlite';
+    }
+
     private function sanitize(string $name): string
     {
         $name = strtolower(preg_replace('/[^a-z0-9_]+/', '', $name));
@@ -23,7 +28,7 @@ return new class extends Migration
         // shorten: keep beginning + hash tail to ensure uniqueness
         $hash = substr(sha1($name), 0, 8);
 
-        return substr($name, 0, 54).'_'.$hash; // total 63
+        return substr($name, 0, 54) . '_' . $hash; // total 63
     }
 
     /** @param string[] $columns */
@@ -38,9 +43,27 @@ return new class extends Migration
             }
         }
 
-        $canonical = $this->sanitize($name ?: ($table.'_'.implode('_', $columns).'_idx'));
+        $canonical = $this->sanitize($name ?: ($table . '_' . implode('_', $columns) . '_idx'));
 
-        // Check if any index already covers exactly these columns (order-insensitive check via pg_get_indexdef)
+        // SQLite: simple existence check via PRAGMA
+        if ($this->isSqlite()) {
+            $colsList = implode(',', $columns);
+            $indexes = DB::select("PRAGMA index_list('{$table}')");
+            foreach ($indexes as $idx) {
+                if (isset($idx->name)) {
+                    $info = DB::select("PRAGMA index_info('{$idx->name}')");
+                    $idxCols = array_map(fn($r) => $r->name, $info);
+                    if ($idxCols === $columns) {
+                        return; // already exists
+                    }
+                }
+            }
+            $cols = '"' . implode('","', $columns) . '"';
+            DB::statement(sprintf('CREATE INDEX IF NOT EXISTS %s ON "%s" (%s)', $canonical, $table, $cols));
+            return;
+        }
+
+        // PostgreSQL logic
         $colsList = implode('","', $columns);
         $sql = <<<'SQL'
             SELECT i.relname AS index_name, pg_get_indexdef(ix.indexrelid) AS def
@@ -59,7 +82,7 @@ return new class extends Migration
             $def = strtolower($row->def);
             $ok = true;
             foreach ($columns as $col) {
-                if (strpos($def, '("'.strtolower($col).'"') === false && strpos($def, '('.strtolower($col).')') === false) {
+                if (strpos($def, '("' . strtolower($col) . '"') === false && strpos($def, '(' . strtolower($col) . ')') === false) {
                     $ok = false;
                     break;
                 }
@@ -71,7 +94,7 @@ return new class extends Migration
         }
 
         if (! $covered) {
-            $cols = '"'.$colsList.'"';
+            $cols = '"' . $colsList . '"';
             $sqlCreate = sprintf('CREATE INDEX IF NOT EXISTS %s ON "%s" (%s)', $canonical, $table, $cols);
             DB::statement($sqlCreate);
         }
@@ -79,6 +102,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        if ($this->isSqlite()) {
+            echo "[cleanup_index_names] Skipped PostgreSQL-specific checks; using SQLite PRAGMA.\n";
+        }
+
         // Social
         $this->ensureIndex('posts', ['user_id']);
         $this->ensureIndex('posts', ['status']);
@@ -98,7 +125,6 @@ return new class extends Migration
         $this->ensureIndex('order_items', ['order_id']);
         $this->ensureIndex('order_items', ['product_id']);
         $this->ensureIndex('inventory', ['product_id']);
-        // composite commonly used
         $this->ensureIndex('order_items', ['order_id', 'product_id']);
 
         // Wallets / NFTs
@@ -116,7 +142,7 @@ return new class extends Migration
         $this->ensureIndex('proposals', ['ends_at']);
         $this->ensureIndex('votes', ['proposal_id']);
         $this->ensureIndex('votes', ['user_id']);
-        $this->ensureIndex('votes', ['proposal_id', 'user_id']); // supports unique check scans
+        $this->ensureIndex('votes', ['proposal_id', 'user_id']);
 
         // Accounting / Audit
         $this->ensureIndex('accounts', ['user_id']);

@@ -1,21 +1,18 @@
 import { api } from "./api";
 
-export async function csrf() {
-  await api.get("/sanctum/csrf-cookie");
-}
+// نیازی به csrf نیست (اندپوینت‌ها CSRF-exempt هستند)
 
 export async function login(email, password) {
-  await csrf();
-  const { data } = await api.post("/login-spa", { email, password });
-  return data;
+  const { data } = await api.post("/spa-auth/login", { email, password });
+  return data; // { ok: true, user: {...} } یا خطای 422
 }
 
 export async function me() {
-  const { data } = await api.get("/me");
-  return data;
+  const { data } = await api.get("/spa-auth/me");
+  return data; // { ok: true/false, user: {...}|null }
 }
 
 export async function logout() {
-  await api.post("/logout-spa");
+  const { data } = await api.post("/spa-auth/logout");
+  return data; // { ok: true }
 }
-

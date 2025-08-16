@@ -8,6 +8,11 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
+    private function isSqlite(): bool
+    {
+        return DB::getDriverName() === 'sqlite';
+    }
+
     private function ensureTable(string $table): void
     {
         if (! Schema::hasTable($table)) {
@@ -24,6 +29,11 @@ return new class extends Migration
 
     private function constraintExists(string $table, string $name): bool
     {
+        // این پرس‌وجو مخصوص PostgreSQL است؛ روی SQLite فقط false برمی‌گردانیم.
+        if ($this->isSqlite()) {
+            return false;
+        }
+
         $row = DB::selectOne(
             'SELECT 1 FROM pg_constraint WHERE conname = ? LIMIT 1',
             [$name]
@@ -34,6 +44,11 @@ return new class extends Migration
 
     private function addCheck(string $table, string $name, string $expression): void
     {
+        if ($this->isSqlite()) {
+            // اضافه‌کردن CHECK به جدول موجود در SQLite نیاز به بازسازی جدول دارد؛ فعلاً رد می‌کنیم.
+            return;
+        }
+
         $this->ensureTable($table);
         if ($this->constraintExists($table, $name)) {
             return;
@@ -43,6 +58,11 @@ return new class extends Migration
 
     private function setNotNull(string $table, string $column): void
     {
+        if ($this->isSqlite()) {
+            // ALTER COLUMN ... SET NOT NULL در SQLite پشتیبانی نمی‌شود؛ نیاز به بازسازی جدول دارد—فعلاً رد می‌کنیم.
+            return;
+        }
+
         $this->ensureTable($table);
         $this->ensureColumn($table, $column);
         DB::statement("ALTER TABLE \"{$table}\" ALTER COLUMN \"{$column}\" SET NOT NULL");
@@ -50,6 +70,11 @@ return new class extends Migration
 
     private function addUnique(string $table, string $name, array $columns): void
     {
+        if ($this->isSqlite()) {
+            // اضافه‌کردن UNIQUE constraint هم در SQLite برای جداول موجود، بازسازی می‌خواهد—فعلاً رد می‌کنیم.
+            return;
+        }
+
         $this->ensureTable($table);
         if ($this->constraintExists($table, $name)) {
             return;
@@ -60,6 +85,12 @@ return new class extends Migration
 
     public function up(): void
     {
+        // اگر دیتابیس SQLite است، کل مایگریشن را رد کن تا خطای ALTER نیاید.
+        if ($this->isSqlite()) {
+            echo "[harden_constraints] Skipped on SQLite.\n";
+            return;
+        }
+
         // --- posts ---
         $this->setNotNull('posts', 'user_id');
         $this->addCheck('posts', 'posts_status_chk', "\"status\" IN ('draft','published','archived')");

@@ -4,7 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>DigitalCity</title>
-  @vite(['resources/css/app.css','resources/js/app.js'])
+  {{-- فقط JS را صدا بزن؛ CSS را app.js ایمپورت می‌کند --}}
+  @vite('resources/js/app.js')
 </head>
 <body>
 <header class="header">
@@ -20,5 +21,3 @@
 </main>
 </body>
 </html>
----
-

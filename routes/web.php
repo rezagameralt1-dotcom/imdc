@@ -1,59 +1,119 @@
 <?php
 
-// --- IMDC_AUTOBOT: login placeholder ---
 use Illuminate\Support\Facades\Route;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
-Route::get('/login', function () {
-    return response('LOGIN OK', 200);
-})->name('login');
-// --- /IMDC_AUTOBOT ---
+/*
+|--------------------------------------------------------------------------
+| Web Routes
+|--------------------------------------------------------------------------
+*/
 
-// --- IMDC_AUTOBOT: healthz ---
-use Illuminate\Support\Facades\Route;
-
-if (! function_exists('imdc_healthz_defined')) {
-    function imdc_healthz_defined()
-    {
-        return true;
-    }
-    Route::get('/healthz', function () {
-        return response('HEALTH OK', 200);
-    })->name('healthz');
+# ---------- Home ----------
+if (class_exists(\App\Http\Controllers\Site\HomeController::class)) {
+    Route::get('/', [\App\Http\Controllers\Site\HomeController::class, 'index'])->name('home');
+} else {
+    Route::get('/', fn () => view('welcome'))->name('home');
 }
-// --- /IMDC_AUTOBOT ---
 
-use Illuminate\Support\Facades\Route;
+# ---------- UI demo ----------
+Route::get('/ui', fn () => view('ui.index'))->name('ui');
 
-Route::get('/', function () {
-    return view('welcome');
-});
+# ---------- Blog ----------
+if (class_exists(\App\Http\Controllers\Site\BlogController::class)) {
+    Route::get('/blog', [\App\Http\Controllers\Site\BlogController::class, 'index'])->name('blog.index');
+    Route::get('/blog/{slug}', [\App\Http\Controllers\Site\BlogController::class, 'show'])->name('blog.show');
+}
 
-// OpenAPI UI (Swagger & Redoc)
-Route::get('/api/docs', function () {
-    return view('docs.openapi');
-});
+# ---------- Static pages ----------
+if (class_exists(\App\Http\Controllers\Site\PageController::class)) {
+    Route::get('/pages/{slug}', [\App\Http\Controllers\Site\PageController::class, 'show'])->name('pages.show');
+}
 
-// Sentry test route (only in local)
-Route::get('/debug/sentry', function () {
-    if (! app()->environment('local')) {
-        abort(404);
-    }
-    throw new \RuntimeException('Sentry test exception from /debug/sentry');
-});
+# ---------- Contact ----------
+if (class_exists(\App\Http\Controllers\Site\ContactController::class)) {
+    Route::get('/contact', [\App\Http\Controllers\Site\ContactController::class, 'form'])->name('contact.form');
+    Route::post('/contact', [\App\Http\Controllers\Site\ContactController::class, 'submit'])->name('contact.submit');
+}
 
-Route::get('/', function () {
-    return 'IMDC OK';
-});
+# ---------- Admin dashboard (auth) ----------
+if (class_exists(\App\Http\Controllers\Admin\DashboardController::class)) {
+    Route::middleware('auth')->group(function () {
+        Route::get('/admin', [\App\Http\Controllers\Admin\DashboardController::class, 'index'])
+            ->name('admin.dashboard');
+    });
+}
 
-Route::get('/healthz', function () {
+# ---------- ساده‌های کمکی ----------
+Route::get('/login', fn () => response('LOGIN OK', 200))->name('login');
+
+# روت تست سلامت بدون هیچ میدلور یا وابستگی
+Route::middleware([])->get('/healthz', function () {
     return response('HEALTH OK', 200);
+})->name('healthz');
+
+# ---------- SPA Auth (Session JSON) ----------
+$csrfClass = class_exists(\App\Http\Middleware\VerifyCsrfToken::class)
+    ? \App\Http\Middleware\VerifyCsrfToken::class
+    : (class_exists(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)
+        ? \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class
+        : null);
+
+Route::prefix('spa-auth')->group(function () use ($csrfClass) {
+
+    // Login
+    $login = Route::post('/login', function (Request $request) {
+        $creds = $request->validate([
+            'email'    => 'required|email',
+            'password' => 'required|string',
+        ]);
+
+        if (! Auth::attempt($creds)) {
+            return response()->json(['ok' => false, 'message' => 'Invalid credentials'], 422);
+        }
+
+        $request->session()->regenerate();
+        $user = $request->user();
+
+        return response()->json([
+            'ok' => true,
+            'user' => [
+                'id'       => $user->id,
+                'name'     => $user->name,
+                'email'    => $user->email,
+                'is_admin' => (bool)($user->is_admin ?? false),
+            ],
+        ]);
+    })->name('spa.login');
+    if ($csrfClass) { $login->withoutMiddleware([$csrfClass]); }
+
+    // Me
+    Route::get('/me', function (Request $request) {
+        $user = $request->user();
+        if (! $user) {
+            return response()->json(['ok' => false, 'user' => null], 200);
+        }
+        return response()->json([
+            'ok' => true,
+            'user' => [
+                'id'       => $user->id,
+                'name'     => $user->name,
+                'email'    => $user->email,
+                'is_admin' => (bool)($user->is_admin ?? false),
+            ],
+        ]);
+    })->name('spa.me');
+
+    // Logout
+    $logout = Route::post('/logout', function (Request $request) {
+        Auth::guard()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['ok' => true]);
+    })->name('spa.logout');
+    if ($csrfClass) { $logout->withoutMiddleware([$csrfClass]); }
 });
 
-/**
- * TEMPORARY SAFE LOGIN PLACEHOLDER
- * Replaces failing /login route with a minimal 200 response for pipeline.
- * TODO: Replace with real auth view/controller later.
- */
-Route::get('/login', function () {
-    return response('<!doctype html><html><head><meta charset="utf-8"><title>Login</title></head><body><h1>Login</h1><p>Temporary OK for pipeline.</p></body></html>', 200);
-});
+Route::get('/api/health', fn() => response()->json(['ok'=>true]))->name('api.health');

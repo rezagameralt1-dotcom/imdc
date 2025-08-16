@@ -9,5 +9,5 @@
   <a href="/ui" class="{{ $is('ui') }}">UI</a>
   <span class="right"></span>
 </nav>
----
+
 

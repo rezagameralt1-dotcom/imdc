@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# --- تنظیمات ---
+# تنظیمات 
 ZIP_PATH="${1:-}"
 PROJECT_ROOT="/var/www/imdc"
 BACKUP_DIR="$PROJECT_ROOT/_import_backups"

@@ -48,6 +48,30 @@
 
   <h2 style="margin-top:24px">Result Box</h2>
   <div class="panel mono" id="resultBox">{ }</div>
-@endsection
----
 
+  <h2 style="margin-top:24px">تست Auth</h2>
+  <button class="btn" type="button" onclick="testAuth()">تست لاگین و me</button>
+@endsection
+
+@push('scripts')
+<script>
+  (function () {
+    async function testAuth() {
+      const box = document.getElementById('resultBox');
+      box.textContent = 'Loading...';
+      try {
+        const r = await axios.post('http://digitalcity.test/spa-auth/login', {
+          email: 'admin@example.com',
+          password: 'Admin12345!'
+        });
+        axios.defaults.headers.common.Authorization = `Bearer ${r.data.token ?? ''}`;
+        const me = await axios.get('http://digitalcity.test/spa-auth/me');
+        box.textContent = JSON.stringify(me.data, null, 2);
+      } catch (e) {
+        box.textContent = (e && e.message) ? e.message : String(e);
+      }
+    }
+    window.testAuth = testAuth;
+  })();
+</script>
+@endpush
