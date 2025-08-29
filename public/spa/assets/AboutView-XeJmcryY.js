@@ -1,0 +1,1 @@
+import{u as o,c as a,a as e,t as n,b as c,o as r}from"./index-CxE0qrSE.js";const l={class:"space-y-2"},_={class:"text-xl font-semibold"},d={__name:"AboutView",setup(i){const{t:s}=o();return(p,t)=>(r(),a("section",l,[e("h2",_,n(c(s)("about")),1),t[0]||(t[0]=e("p",{class:"text-gray-700"},"IMDC Level 9 — Frontend Skeleton",-1))]))}};export{d as default};

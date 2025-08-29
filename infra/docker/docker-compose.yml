@@ -1,0 +1,49 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    image: imdc-php:8.2
+    container_name: imdc_app
+    working_dir: /var/www/html
+    volumes:
+      - ../../:/var/www/html
+    depends_on:
+      - db
+      - redis
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: imdc-nginx:1.24
+    container_name: imdc_web
+    ports:
+      - "8080:80"
+    volumes:
+      - ../../:/var/www/html
+      - ../nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app
+
+  db:
+    image: postgres:15-alpine
+    container_name: imdc_db
+    environment:
+      POSTGRES_DB: imdc
+      POSTGRES_USER: imdc
+      POSTGRES_PASSWORD: imdc
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    container_name: imdc_redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  db_data: {}

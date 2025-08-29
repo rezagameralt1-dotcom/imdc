@@ -1,0 +1,17 @@
+/vendor/
+/node_modules/
+/bootstrap/cache/*
+/storage/*.key
+/storage/app/public/*
+/storage/debugbar/*
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+/.env
+
+# Frontend build artifacts (Vite)
+dist/
+# If you ever move SPA under public/spa:
+public/spa/

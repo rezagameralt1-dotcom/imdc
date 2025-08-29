@@ -1,0 +1,42 @@
+<?php
+
+use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\PingController;
+
+// تعریف میان‌افزار نقش (بدون نیاز به تغییر Kernel)
+app('router')->aliasMiddleware('role', \App\Http\Middleware\RoleMiddleware::class);
+
+// پینگ عمومی
+Route::get('/ping', PingController::class);
+
+// احراز هویت با Sanctum (توکن Bearer)
+Route::prefix('auth')->group(function () {
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('token',    [AuthController::class, 'issueToken']);
+
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('me',      [AuthController::class, 'me']);
+    });
+});
+
+// مسیرهای محافظت‌شده
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/secure/ping', function () {
+        return response()->json([
+            'success'  => true,
+            'data'     => ['message' => 'secure pong'],
+            'trace_id' => uniqid()
+        ]);
+    });
+
+    // فقط ادمین
+    Route::get('/admin/ping', function () {
+        return response()->json([
+            'success'  => true,
+            'data'     => ['message' => 'admin pong'],
+            'trace_id' => uniqid()
+        ]);
+    })->middleware('role:Admin');
+});

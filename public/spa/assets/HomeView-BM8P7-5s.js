@@ -1,0 +1,1 @@
+import{u as o,c as a,a as s,t as n,b as i,o as c}from"./index-CxE0qrSE.js";const r={class:"space-y-4"},l={class:"text-2xl font-semibold"},m={__name:"HomeView",setup(_){const{t}=o();return(p,e)=>(c(),a("section",r,[s("h2",l,n(i(t)("hello")),1),e[0]||(e[0]=s("p",{class:"text-sm text-gray-600"},"Vue 3 + Vite + Tailwind + Router + Pinia + i18n + Axios",-1))]))}};export{m as default};
