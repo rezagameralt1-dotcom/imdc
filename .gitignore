@@ -24,3 +24,5 @@ routes/*.bak.*
 app/Models/*.bak
 .phpunit.result.cache
 imdc_*_release.zip
+*.zip
+*.zip
