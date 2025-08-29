@@ -8,8 +8,21 @@ PRODUCT_ID ?= $(shell sudo -u postgres psql -At -d imdc -c "select id from produ
 QTY ?= 1
 UNIT_PRICE ?= 99000
 REASON ?=
+TARGET ?=
 
-.PHONY: smoke setinv restock preflight help
+.PHONY: help preflight smoke setinv restock test deploy
+
+help:
+	@echo "Targets:"
+	@echo "  make preflight"
+	@echo "  make smoke [PRODUCT_ID=.. QTY=.. UNIT_PRICE=..]"
+	@echo "  make setinv PRODUCT_ID=.. TARGET=.."
+	@echo "  make restock PRODUCT_ID=.. QTY=.. [REASON=..]"
+	@echo "  make test    (نیاز به dev deps)"
+	@echo "  make deploy  (دیپلوی استاندارد)"
+
+preflight:
+	bash scripts/preflight.sh
 
 smoke:
 	BASE="$(BASE)" TOKEN="$(TOKEN)" PRODUCT_ID="$(PRODUCT_ID)" QTY="$(QTY)" UNIT_PRICE="$(UNIT_PRICE)" bash scripts/market_smoke.sh
@@ -22,12 +35,8 @@ restock:
 	@[ -n "$(QTY)" ] || { echo "Usage: make restock PRODUCT_ID=.. QTY=.. [REASON=..]"; exit 1; }
 	BASE="$(BASE)" TOKEN="$(TOKEN)" bash scripts/inventory_restock.sh "$(PRODUCT_ID)" "$(QTY)" "$(REASON)"
 
-preflight:
-	bash scripts/preflight.sh
+test:
+	@if [ -x vendor/bin/phpunit ]; then php artisan test -q; else echo "Dev deps not installed; run: composer install"; exit 1; fi
 
-help:
-	@echo "Targets:"
-	@echo "  make preflight"
-	@echo "  make setinv PRODUCT_ID=.. TARGET=.."
-	@echo "  make restock PRODUCT_ID=.. QTY=.. [REASON=..]"
-	@echo "  make smoke [PRODUCT_ID=.. QTY=.. UNIT_PRICE=..]"
+deploy:
+	bash scripts/deploy_prod.sh

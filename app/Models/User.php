@@ -6,14 +6,17 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use Spatie\Permission\Traits\HasRoles;
 
 class User extends Authenticatable
 {
-    use HasApiTokens, HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable, HasRoles;
+
+    // چون در جداول roles/permissions ستون guard_name را "web" گذاشتی:
+    protected $guard_name = 'web';
 
     protected $fillable = ['name','email','password'];
-
-    protected $hidden = ['password','remember_token'];
+    protected $hidden   = ['password','remember_token'];
 
     protected function casts(): array
     {
@@ -23,25 +26,9 @@ class User extends Authenticatable
         ];
     }
 
-    // === RBAC ===
-    public function roles() { return $this->belongsToMany(\App\Models\Role::class, 'role_user'); }
-    public function permissions() { return $this->belongsToMany(\App\Models\Permission::class, 'permission_user'); }
-
-    public function hasRole(string $role): bool
-    {
-        return $this->roles()->where('name', $role)->exists();
-    }
-
-    public function hasAnyRole(array $roles): bool
-    {
-        return $this->roles()->whereIn('name', $roles)->exists();
-    }
-
+    // سازگاری با کد قدیمی (اگه میدلور از hasPermission استفاده می‌کنه)
     public function hasPermission(string $perm): bool
     {
-        if ($this->permissions()->where('name', $perm)->exists()) return true;
-        return $this->roles()
-            ->whereHas('permissions', function($q) use ($perm){ $q->where('name', $perm); })
-            ->exists();
+        return $this->hasPermissionTo($perm);
     }
 }

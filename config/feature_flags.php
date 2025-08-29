@@ -1,10 +1,13 @@
 <?php
-
 return [
-    // All disabled by default; toggle true to enable
-    'EXCHANGE'  => false,
-    'VR_TOUR'   => false,
-    'MEZON'     => false,
-    'DAO'       => false,
-    'PHARMA'    => false,
+    // قواعد: پیش‌فرض خاموش مگر صراحتاً روشن شوند
+    'EXCHANGE'       => false,
+    'VR_TOUR'        => false,
+    'MEZON'          => false,
+    'DAO'            => false,
+    'PHARMA'         => false,
+
+    // --- Marketplace (M03) ---
+    'MARKETPLACE'    => true,   // پایه مارکت روشن
+    'ACCOUNTING_SYNC'=> true,   // همگام‌سازی حسابداری روشن (درایور داخلی/آفلاین)
 ];

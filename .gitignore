@@ -15,3 +15,12 @@
 dist/
 # If you ever move SPA under public/spa:
 public/spa/
+# backups & artifacts
+*.bak
+*.bak.*
+Makefile.bak.*
+bootstrap/*.bak.*
+routes/*.bak.*
+app/Models/*.bak
+.phpunit.result.cache
+imdc_*_release.zip
