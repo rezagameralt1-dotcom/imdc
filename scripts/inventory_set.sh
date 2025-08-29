@@ -12,13 +12,15 @@ CUR=$(curl -fsS -H "Accept: application/json" -H "Authorization: Bearer $TOKEN" 
 DELTA=$(( TARGET - CUR ))
 echo "current=$CUR target=$TARGET delta=$DELTA"
 
-if [ "$DELTA" -gt 0 ]; then
+if (( DELTA > 0 )); then
+  # افزایش موجودی
   curl -fsS -X POST "${AUTH[@]}" \
-    -d "$(jq -n --argjson qty "$DELTA" '{qty:qty,reason:"restock"}')" \
+    -d "{\"qty\":${DELTA},\"reason\":\"restock\"}" \
     "$BASE/api/market/products/${PRODUCT_ID}/inventory/add" | jq .
-elif [ "$DELTA" -lt 0 ]; then
+elif (( DELTA < 0 )); then
+  # کاهش/تنظیم موجودی
   curl -fsS -X POST "${AUTH[@]}" \
-    -d "$(jq -n --argjson d "$DELTA" '{delta:d,reason:"adjust to target"}')" \
+    -d "{\"delta\":${DELTA},\"reason\":\"adjust to target\"}" \
     "$BASE/api/market/products/${PRODUCT_ID}/inventory/adjust" | jq .
 else
   echo "already at target"

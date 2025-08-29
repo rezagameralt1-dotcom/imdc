@@ -9,5 +9,5 @@ QTY=${2:?Usage: inventory_restock.sh <product_id> <qty> [reason]}
 REASON=${3:-restock}
 
 curl -fsS -X POST "${AUTH[@]}" \
-  -d "$(jq -n --argjson qty "$QTY" --arg reason "$REASON" '{qty:qty,reason:reason}')" \
+  -d "{\"qty\":${QTY},\"reason\":\"${REASON}\"}" \
   "$BASE/api/market/products/${PRODUCT_ID}/inventory/add" | jq .

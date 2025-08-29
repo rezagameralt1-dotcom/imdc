@@ -23,7 +23,7 @@ ORDER_JSON=$(curl -fsS -X POST "${AUTH[@]}" \
 echo "$ORDER_JSON" | jq .
 ORDER_ID=$(echo "$ORDER_JSON" | jq -r '.data.id')
 
-echo "[POST] pay #$ORDER_ID"
+echo "[POST] pay #$ORDER_ID]"
 curl -fsS -X POST -H "Accept: application/json" -H "Authorization: Bearer $TOKEN" \
   "$BASE/api/market/orders/${ORDER_ID}/pay" | jq .
 
@@ -32,7 +32,6 @@ INV_AFTER_JSON=$(curl -fsS -H "Accept: application/json" -H "Authorization: Bear
 echo "$INV_AFTER_JSON" | jq .
 AFTER=$(echo "$INV_AFTER_JSON" | jq -r '.data.stock_on_hand')
 
-# چک اختلاف موجودی
 DIFF=$(( BEFORE - AFTER ))
 if [ "$DIFF" -ne "$QTY" ]; then
   echo "❌ stock delta mismatch: before=$BEFORE after=$AFTER expected_delta=$QTY got=$DIFF"
@@ -42,14 +41,7 @@ fi
 echo "[GET] movements (search for sale:order#$ORDER_ID)"
 MOV_JSON=$(curl -fsS -H "Accept: application/json" -H "Authorization: Bearer $TOKEN" "$BASE/api/market/products/${PRODUCT_ID}/inventory/movements")
 echo "$MOV_JSON" | jq '.data.data[0]'
-
-# بجای فقط ردیف اول، کل صفحه را می‌گردیم
-OK=$(echo "$MOV_JSON" | jq -e --arg rid "sale:order#$ORDER_ID" --argjson q "$QTY" \
-  '.data.data | map(select(.reason==$rid and .type=="OUT" and .quantity==$q)) | length > 0' >/dev/null && echo yes || echo no)
-
-if [ "$OK" != "yes" ]; then
-  echo "❌ movement not found for order#$ORDER_ID"
-  exit 1
-fi
+echo "$MOV_JSON" | jq -e --arg rid "sale:order#$ORDER_ID" --argjson q "$QTY" \
+  '.data.data | map(select(.reason==$rid and .type=="OUT" and .quantity==$q)) | length > 0' >/dev/null
 
 echo "OK ✅ movement matched & stock changed by $QTY (from $BEFORE to $AFTER)"
