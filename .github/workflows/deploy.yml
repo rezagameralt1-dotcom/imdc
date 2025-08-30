@@ -12,7 +12,14 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            set -e
             cd /var/www/imdc
             git fetch --all --tags
             git reset --hard origin/main
-            bash scripts/deploy_prod.sh
+            composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-dev
+            php artisan key:generate --force || true
+            php artisan migrate --force
+            php artisan optimize:clear
+            php artisan config:cache
+            php artisan route:cache
+            php artisan view:cache
