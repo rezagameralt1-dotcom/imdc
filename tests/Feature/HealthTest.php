@@ -3,13 +3,15 @@
 namespace Tests\Feature;
 
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class HealthTest extends TestCase
 {
+    use RefreshDatabase;
+
     public function test_database_is_migrated(): void
     {
-        // چون در CI قبل از تست‌ها migrate می‌کنیم، باید جدول migrations وجود داشته باشد
         $this->assertTrue(Schema::hasTable('migrations'));
     }
 }
