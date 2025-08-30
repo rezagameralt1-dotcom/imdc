@@ -16,6 +16,13 @@ jobs:
           extensions: pdo_pgsql, pgsql, curl
           coverage: none
 
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
       - name: Install composer deps
         run: composer install --no-interaction --no-progress --prefer-dist
 
