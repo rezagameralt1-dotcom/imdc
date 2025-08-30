@@ -13,7 +13,7 @@ jobs:
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: pdo_pgsql, pgsql, curl
+          extensions: sqlite3, pdo_sqlite, curl
           coverage: none
 
       - name: Cache Composer downloads
@@ -26,16 +26,16 @@ jobs:
       - name: Install composer deps
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Prepare .env (sqlite) & key
+      - name: Prepare .env (sqlite) & APP_KEY
         run: |
           cp -n .env.example .env || true
-          php artisan key:generate --no-interaction
-          php -r "echo preg_replace('/^DB_CONNECTION=.*/m','DB_CONNECTION=sqlite', file_get_contents('.env'));" > .env.tmp && mv .env.tmp .env
-          if ! grep -q '^DB_DATABASE=' .env; then echo 'DB_DATABASE=database/testing.sqlite' >> .env; else sed -i 's#^DB_DATABASE=.*#DB_DATABASE=database/testing.sqlite#' .env; fi
+          sed -i 's/^DB_CONNECTION=.*/DB_CONNECTION=sqlite/' .env || echo "DB_CONNECTION=sqlite" >> .env
+          sed -i 's#^DB_DATABASE=.*#DB_DATABASE=database/testing.sqlite#' .env || echo "DB_DATABASE=database/testing.sqlite" >> .env
           mkdir -p database && touch database/testing.sqlite
+          php artisan key:generate --no-interaction --force
 
-      - name: Migrate (fresh)
-        run: php artisan migrate:fresh --force
+      - name: Migrate
+        run: php artisan migrate --force
 
       - name: Run tests
         run: php artisan test -q
