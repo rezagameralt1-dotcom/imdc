@@ -4,6 +4,7 @@ on: [push, pull_request]
 jobs:
   php-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
@@ -27,8 +28,10 @@ jobs:
       - name: Install deps (with dev)
         run: composer install --no-interaction --no-progress --prefer-dist
 
-      - name: Prepare app key
+      - name: Prepare .env + key
         run: cp .env.example .env && php artisan key:generate --no-interaction
 
       - name: Run tests
         run: php artisan test -q
+        env:
+          APP_ENV: testing
