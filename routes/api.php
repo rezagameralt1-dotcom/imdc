@@ -1,11 +1,10 @@
 <?php
-use Illuminate\\Support\\Facades\\Route;
-use App\\Http\\Controllers\\AuthTokenController;
-use App\\Http\\Controllers\\DemoController;
-
-
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthTokenController;
+use App\Http\Controllers\DemoController;
+
+
+
 
 Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
 
@@ -27,10 +26,6 @@ Route::middleware(['auth:sanctum','permission:system.view'])->get('/perm/ping', 
 });
 
 // ===== M03: Marketplace Base (protected) =====
-use App\Http\Controllers\Api\Marketplace\CategoryController;
-use App\Http\Controllers\Api\Marketplace\ProductController;
-use App\Http\Controllers\Api\Marketplace\InventoryController;
-use App\Http\Controllers\Api\Marketplace\OrderController;
 
 Route::middleware(['auth:sanctum'])->group(function () {
     // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
@@ -61,6 +56,5 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
 });
 
-use App\\Http\\Controllers\\DemoController;
 Route::get("demo/hello", [DemoController::class, "hello"]);
 Route::middleware("auth:sanctum")->get("demo/secure", [DemoController::class, "secure"]);
