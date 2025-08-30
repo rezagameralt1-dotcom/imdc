@@ -26,3 +26,4 @@ app/Models/*.bak
 imdc_*_release.zip
 *.zip
 *.zip
+storage/serve.pid
