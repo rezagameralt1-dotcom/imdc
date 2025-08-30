@@ -1,4 +1,5 @@
 <?php
+use Illuminate\\Support\\Facades\\Route;
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthTokenController;
@@ -56,3 +57,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
     Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
 });
+
+use App\\Http\\Controllers\\DemoController;
+Route::get("demo/hello", [DemoController::class, "hello"]);
+Route::middleware("auth:sanctum")->get("demo/secure", [DemoController::class, "secure"]);
