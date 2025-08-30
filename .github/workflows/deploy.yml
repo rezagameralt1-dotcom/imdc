@@ -1,25 +1,72 @@
-name: Deploy (manual)
-on: [workflow_dispatch]
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (tag/branch/commit)"
+        required: true
+        default: "main"
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
     steps:
-      - name: SSH into server & deploy
+      - name: Resolve ref
+        id: ref
+        run: |
+          if [ -n "${{ github.event.inputs.ref }}" ]; then
+            echo "REF=${{ github.event.inputs.ref }}" >> $GITHUB_OUTPUT
+          else
+            echo "REF=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          script_stop: true
           script: |
-            set -e
+            set -euo pipefail
             cd /var/www/imdc
+            echo ">>> Fetch & checkout"
             git fetch --all --tags
-            git reset --hard origin/main
-            composer install --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-dev
-            php artisan key:generate --force || true
+            git checkout --force "${{ steps.ref.outputs.REF }}"
+            git reset --hard "origin/${{ steps.ref.outputs.REF }}" || true
+            git submodule update --init --recursive || true
+
+            echo ">>> Backend deps (no-dev) & optimize"
+            composer install --no-interaction --no-progress --prefer-dist --no-dev
+            php artisan config:clear || true
+            php artisan cache:clear || true
+
+            echo ">>> Frontend build (Vite)"
+            [ -d frontend ] && (cd frontend && npm ci && npm run build && rsync -a dist/ ../public/spa/) || true
+
+            echo ">>> Migrate & optimize"
             php artisan migrate --force
-            php artisan optimize:clear
-            php artisan config:cache
-            php artisan route:cache
-            php artisan view:cache
+            php artisan route:cache || true
+            php artisan config:cache || true
+            php artisan view:cache || true
+
+            echo ">>> Permissions (storage/bootstrap) "
+            chown -R www-data:www-data storage bootstrap/cache public/spa || true
+            find storage -type d -exec chmod 775 {} \; || true
+            find storage -type f -exec chmod 664 {} \; || true
+
+            echo ">>> Reload PHP-FPM & Nginx"
+            systemctl reload php8.2-fpm || true
+            systemctl reload nginx || true
+
+            echo ">>> DONE"
