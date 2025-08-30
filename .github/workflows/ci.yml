@@ -7,30 +7,24 @@ jobs:
     timeout-minutes: 10
     env:
       APP_ENV: testing
-
     steps:
       - uses: actions/checkout@v4
-
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
           extensions: pdo_pgsql, pgsql, curl
           coverage: none
-
       - name: Cache Composer downloads
         uses: actions/cache@v4
         with:
           path: ~/.cache/composer
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
-
       - name: Install composer deps
         run: composer install --no-interaction --no-progress --prefer-dist
-
       - name: Prepare .env & key
         run: |
           cp -n .env.example .env || true
           php artisan key:generate --no-interaction
-
       - name: Run tests
         run: php artisan test -q
