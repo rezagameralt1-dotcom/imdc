@@ -9,22 +9,50 @@ jobs:
       APP_ENV: testing
     steps:
       - uses: actions/checkout@v4
+
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: pdo_pgsql, pgsql, curl
+          # هم sqlite و هم pgsql فعال باشند که بعداً دستت باز باشد
+          extensions: sqlite3, pdo_sqlite, pdo_pgsql, pgsql, curl
           coverage: none
+
       - name: Cache Composer downloads
         uses: actions/cache@v4
         with:
           path: ~/.cache/composer
           key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
           restore-keys: ${{ runner.os }}-composer-
+
       - name: Install composer deps
         run: composer install --no-interaction --no-progress --prefer-dist
-      - name: Prepare .env & key
+
+      - name: Prepare .env & key (testing)
         run: |
           cp -n .env.example .env || true
-          php artisan key:generate --no-interaction
+          # کلید برای env اصلی
+          php artisan key:generate --no-interaction || true
+          # .env.testing با sqlite و کلید تصادفی
+          cat > .env.testing <<'ENV'
+          APP_ENV=testing
+          APP_DEBUG=true
+          LOG_CHANNEL=stack
+          DB_CONNECTION=sqlite
+          DB_DATABASE=${{ github.workspace }}/database/database.sqlite
+          CACHE_STORE=array
+          SESSION_DRIVER=array
+          QUEUE_CONNECTION=sync
+          ENV
+          echo "APP_KEY=$(php -r "echo 'base64:'.base64_encode(random_bytes(32));")" >> .env.testing
+
+      - name: Prepare testing database (sqlite) + migrate
+        run: |
+          mkdir -p database
+          touch database/database.sqlite
+          php artisan migrate --no-interaction -q --env=testing
+
+      - name: Composer validate
+        run: composer validate --no-interaction --strict
+
       - name: Run tests
         run: php artisan test -q
