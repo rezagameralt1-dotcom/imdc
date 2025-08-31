@@ -1,4 +1,4 @@
-name: CI/php-tests
+name: CI
 
 on:
   push:
@@ -13,7 +13,7 @@ jobs:
 
     env:
       APP_ENV: testing
-      # 32-byte base64 key (ثابت برای تست)
+      # 32-byte base64 key ثابت برای تست‌ها
       APP_KEY: base64:WnVfZ0V5Qk9rT0tLUmVhZHlUZXN0S2V5MzJieXRlcw==
       CACHE_DRIVER: array
       SESSION_DRIVER: array
@@ -39,7 +39,7 @@ jobs:
       - name: Show PHP & extensions
         run: |
           php -v
-          php -m
+          php -m | sort
           composer -V
 
       - name: Cache Composer
@@ -62,7 +62,6 @@ jobs:
       - name: Setup .env for tests
         run: |
           if [ -f ".env.testing" ]; then cp .env.testing .env; fi
-          # تضمین وجود APP_KEY داخل فایل هم (علاوه‌بر env job)
           grep -q '^APP_KEY=' .env || echo "APP_KEY=${APP_KEY}" >> .env
           echo "DB_CONNECTION=sqlite" >> .env
           echo "DB_DATABASE=:memory:" >> .env
