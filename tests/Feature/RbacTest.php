@@ -29,11 +29,11 @@ class RbacTest extends TestCase
 
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // ساخت نمونه‌ها با guard sanctum
-        $this->permView      = Permission::findOrCreate('system.view', 'sanctum');
-        $this->permOrdersRead= Permission::findOrCreate('orders.read', 'sanctum');
-        $this->adminRole     = Role::findOrCreate('Admin', 'sanctum');
-        $this->userRole      = Role::findOrCreate('User', 'sanctum');
+        // نقش/پرمیژن‌ها با guard 'web'
+        $this->permView       = Permission::findOrCreate('system.view', 'web');
+        $this->permOrdersRead = Permission::findOrCreate('orders.read', 'web');
+        $this->adminRole      = Role::findOrCreate('Admin', 'web');
+        $this->userRole       = Role::findOrCreate('User', 'web');
 
         // یوزرها
         $this->admin = User::factory()->create([
@@ -45,7 +45,7 @@ class RbacTest extends TestCase
             'password' => Hash::make('secret123'),
         ]);
 
-        // اتصال نقش/پرمیژن با نمونه‌ها (نه رشته)
+        // اتصال با نمونه‌ها (از mismatch جلوگیری می‌کند)
         $this->admin->syncRoles([$this->adminRole]);
         $this->admin->syncPermissions([$this->permView, $this->permOrdersRead]);
 
@@ -55,11 +55,13 @@ class RbacTest extends TestCase
 
     public function test_admin_can_access_admin_ping_and_user_cannot(): void
     {
+        // Admin → 200
         $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/admin/ping')
             ->assertOk()
             ->assertJsonPath('success', true);
 
+        // User → 403
         $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/admin/ping')
             ->assertForbidden();
