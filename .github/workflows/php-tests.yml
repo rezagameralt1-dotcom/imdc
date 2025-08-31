@@ -7,18 +7,23 @@ on:
     branches: [ main ]
 
 jobs:
-  tests:
+  php-tests:
+    name: tests
     runs-on: ubuntu-latest
 
     env:
       APP_ENV: testing
-      # کلید ثابت برای تست‌ها (32 بایت base64)
+      # 32-byte base64 key (ثابت برای تست)
       APP_KEY: base64:WnVfZ0V5Qk9rT0tLUmVhZHlUZXN0S2V5MzJieXRlcw==
       CACHE_DRIVER: array
       SESSION_DRIVER: array
       QUEUE_CONNECTION: sync
       DB_CONNECTION: sqlite
       DB_DATABASE: ':memory:'
+      LOG_CHANNEL: stderr
+      BROADCAST_DRIVER: log
+      FILESYSTEM_DISK: local
+      MAIL_MAILER: log
 
     steps:
       - name: Checkout
@@ -30,6 +35,12 @@ jobs:
           php-version: '8.2'
           extensions: mbstring, intl, pdo_sqlite, bcmath, gd, xml, fileinfo
           coverage: none
+
+      - name: Show PHP & extensions
+        run: |
+          php -v
+          php -m
+          composer -V
 
       - name: Cache Composer
         uses: actions/cache@v4
@@ -48,7 +59,16 @@ jobs:
           mkdir -p bootstrap/cache
           chmod -R 777 storage bootstrap/cache
 
-      - name: Clear & Reset Permission Cache
+      - name: Setup .env for tests
+        run: |
+          if [ -f ".env.testing" ]; then cp .env.testing .env; fi
+          # تضمین وجود APP_KEY داخل فایل هم (علاوه‌بر env job)
+          grep -q '^APP_KEY=' .env || echo "APP_KEY=${APP_KEY}" >> .env
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=:memory:" >> .env
+          php artisan key:generate --force || true
+
+      - name: Clear & Reset Caches
         run: |
           php artisan optimize:clear
           php artisan permission:cache-reset || true
