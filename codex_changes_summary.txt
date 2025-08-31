@@ -5,8 +5,8 @@ Summary of changes vs main:
  app/Http/Controllers/Api/AuthController.php        |    2 +-
  app/Http/Controllers/DemoController.php            |   25 +
  app/Http/Kernel.php                                |    0
- codex_changes_full.diff                            | 3770 ++++++++++++++++++++
- codex_changes_summary.txt                          |   26 +
+ codex_changes_full.diff                            | 4640 ++++++++++++++++++++
+ codex_changes_summary.txt                          |   27 +
  codex_nudge.txt                                    |    1 +
  ..._000001_create_personal_access_tokens_table.php |   23 +
  ...25_08_28_000002_create_role_user_table.php.bak} |    0
@@ -24,4 +24,4 @@ Summary of changes vs main:
  routes/web.php                                     |    6 +
  scripts/codex_report.sh                            |    8 +
  scripts/deploy_local.sh                            |   47 +
- 25 files changed, 4417 insertions(+), 53 deletions(-)
+ 25 files changed, 5288 insertions(+), 53 deletions(-)
