@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, codex/** ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  php-tests:
+    name: tests
+    runs-on: ubuntu-latest
+
+    env:
+      APP_ENV: testing
+      # 32-byte base64 key ثابت برای تست‌ها
+      APP_KEY: base64:WnVfZ0V5Qk9rT0tLUmVhZHlUZXN0S2V5MzJieXRlcw==
+      CACHE_DRIVER: array
+      SESSION_DRIVER: array
+      QUEUE_CONNECTION: sync
+      DB_CONNECTION: sqlite
+      DB_DATABASE: ':memory:'
+      LOG_CHANNEL: stderr
+      BROADCAST_DRIVER: log
+      FILESYSTEM_DISK: local
+      MAIL_MAILER: log
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, intl, pdo_sqlite, bcmath, gd, xml, fileinfo
+          coverage: none
+
+      - name: Show PHP & extensions
+        run: |
+          php -v
+          php -m | sort
+          composer -V
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache/files
+          key: composer-${{ runner.os }}-${{ hashFiles('**/composer.lock') }}
+          restore-keys: |
+            composer-${{ runner.os }}-
+
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Prepare Framework Folders
+        run: |
+          mkdir -p storage/framework/{cache,sessions,testing,views}
+          mkdir -p bootstrap/cache
+          chmod -R 777 storage bootstrap/cache
+
+      - name: Setup .env for tests
+        run: |
+          if [ -f ".env.testing" ]; then cp .env.testing .env; fi
+          grep -q '^APP_KEY=' .env || echo "APP_KEY=${APP_KEY}" >> .env
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=:memory:" >> .env
+          php artisan key:generate --force || true
+
+      - name: Clear & Reset Caches
+        run: |
+          php artisan optimize:clear
+          php artisan permission:cache-reset || true
+
+      - name: Run Tests (sqlite in-memory)
+        run: php artisan test -v

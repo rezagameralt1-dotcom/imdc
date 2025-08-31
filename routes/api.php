@@ -1,58 +1,74 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthTokenController;
 
-Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
+// از کنترلر احراز هویت موجودِ پروژه استفاده می‌کنیم:
+use App\Http\Controllers\Api\AuthController;
 
-// صدور توکن
-Route::post('/auth/token', [AuthTokenController::class, 'issue']);
+// دمو کنترلر (Codex اضافه کرده):
+use App\Http\Controllers\DemoController;
 
-// مسیر امن پایه
-Route::middleware(['auth:sanctum'])->get('/secure/ping', function () {
-    return response()->json(['success'=>true,'data'=>'pong']);
+/*
+|--------------------------------------------------------------------------
+| Public
+|--------------------------------------------------------------------------
+*/
+Route::get('ping', fn() => response()->json([
+    'success' => true,
+    'data'    => ['pong' => true],
+    'trace_id'=> null,
+]));
+
+// Auth (از کنترلر موجود شما که الان جواب می‌دهد)
+Route::prefix('auth')->group(function () {
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('login',    [AuthController::class, 'issueToken']); // قبلاً همین کار می‌کرد
+    Route::middleware('auth:sanctum')->group(function () {
+        Route::post('logout', [AuthController::class, 'logout']);
+        Route::get('me',      [AuthController::class, 'me']);
+    });
 });
 
-// --- RBAC protected routes ---
-Route::middleware(['auth:sanctum','role:Admin'])->get('/admin/ping', function () {
-    return response()->json(['success'=>true,'data'=>'admin-pong']);
-});
+// Demo routes (عمومی و محافظت‌شده)
+Route::get('demo/hello', [DemoController::class, 'hello']);
+Route::middleware('auth:sanctum')->get('demo/secure', [DemoController::class, 'secure']);
 
-Route::middleware(['auth:sanctum','permission:system.view'])->get('/perm/ping', function () {
-    return response()->json(['success'=>true,'data'=>'perm-pong']);
-});
+/*
+|--------------------------------------------------------------------------
+| Protected (placeholder)
+|--------------------------------------------------------------------------
+| بلاک‌های NFT و Marketplace عمداً غیرفعال شدند تا وقتی کنترلرها آماده شد.
+| اگر لازم شد، بعداً با شرط وجود کلاس‌ها می‌توانیم برگردانیم.
+*/
 
-// ===== M03: Marketplace Base (protected) =====
-use App\Http\Controllers\Api\Marketplace\CategoryController;
-use App\Http\Controllers\Api\Marketplace\ProductController;
-use App\Http\Controllers\Api\Marketplace\InventoryController;
-use App\Http\Controllers\Api\Marketplace\OrderController;
+/*
+// ===== NFT (فعلاً غیرفعال چون کنترلر وجود ندارد) =====
+// use App\Http\Controllers\Api\NFT\NFTController;
+// Route::middleware('auth:sanctum')->prefix('nft')->group(function () {
+//     Route::post('mint',     [NFTController::class, 'mint']);
+//     Route::post('transfer', [NFTController::class, 'transfer']);
+//     Route::post('burn',     [NFTController::class, 'burn']);
+// });
 
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
-    Route::get('/market/categories', [CategoryController::class, 'index'])->middleware('permission:system.view');
-    Route::get('/market/categories/{id}', [CategoryController::class, 'show'])->middleware('permission:system.view');
-    Route::post('/market/categories', [CategoryController::class, 'store'])->middleware('permission:inventory.manage');
-    Route::put('/market/categories/{id}', [CategoryController::class, 'update'])->middleware('permission:inventory.manage');
-    Route::delete('/market/categories/{id}', [CategoryController::class, 'destroy'])->middleware('permission:inventory.manage');
+// ===== Marketplace (فعلاً غیرفعال چون کنترلرها وجود ندارند) =====
+// use App\Http\Controllers\Api\Marketplace\CategoryController;
+// use App\Http\Controllers\Api\Marketplace\ProductController;
+// use App\Http\Controllers\Api\Marketplace\InventoryController;
+// use App\Http\Controllers\Api\Marketplace\OrderController;
+// if (class_exists(\App\Http\Controllers\Api\Marketplace\CategoryController::class)) {
+//     Route::middleware(['auth:sanctum'])->group(function () {
+//         // Categories
+//         Route::get('/market/categories', [CategoryController::class, 'index'])->middleware('permission:system.view');
+//         // ...
+//     });
+// }
+*/
 
-    // Products
-    Route::get('/market/products', [ProductController::class, 'index'])->middleware('permission:system.view');
-    Route::get('/market/products/{id}', [ProductController::class, 'show'])->middleware('permission:system.view');
-    Route::post('/market/products', [ProductController::class, 'store'])->middleware('permission:inventory.manage');
-    Route::put('/market/products/{id}', [ProductController::class, 'update'])->middleware('permission:inventory.manage');
-    Route::delete('/market/products/{id}', [ProductController::class, 'destroy'])->middleware('permission:inventory.manage');
-
-    // Inventory
-    Route::get('/market/products/{productId}/inventory', [InventoryController::class, 'show'])->middleware('permission:inventory.read|inventory.manage');
-    Route::post('/market/products/{productId}/inventory/add', [InventoryController::class, 'add'])->middleware('permission:inventory.manage');
-    Route::post('/market/products/{productId}/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
-    Route::get('/market/products/{productId}/inventory/movements', [InventoryController::class, 'movements'])->middleware('permission:inventory.read|inventory.manage');
-
-    // Orders
-    Route::get('/market/orders', [OrderController::class, 'index'])->middleware('permission:orders.read');
-    Route::get('/market/orders/{id}', [OrderController::class, 'show'])->middleware('permission:orders.read');
-    Route::post('/market/orders', [OrderController::class, 'store'])->middleware('permission:orders.write');
-    Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
-    Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
+// Fallback JSON 404
+Route::fallback(function () {
+    return response()->json([
+        'success' => false,
+        'error'   => ['code' => 404, 'message' => 'API route not found'],
+        'trace_id'=> null,
+    ], 404);
 });

@@ -1,18 +1,84 @@
-name: Deploy (manual)
-on: [workflow_dispatch]
+name: Deploy
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git ref to deploy (tag/branch/commit)"
+        required: true
+        default: "main"
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
     steps:
-      - name: SSH into server & deploy
+      - name: Resolve ref
+        id: ref
+        run: |
+          if [ -n "${{ github.event.inputs.ref }}" ]; then
+            echo "REF=${{ github.event.inputs.ref }}" >> $GITHUB_OUTPUT
+          else
+            # Push on tag
+            echo "REF=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: SSH deploy
         uses: appleboy/ssh-action@v1.2.1
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
+          port: ${{ secrets.SSH_PORT }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            set -euo pipefail
             cd /var/www/imdc
+            echo ">>> Fetch & checkout"
             git fetch --all --tags
-            git reset --hard origin/main
-            bash scripts/deploy_prod.sh
+            # اگر ref یک تگ بود همان تگ را checkout می‌کنیم، اگر برنچ بود به origin sync می‌کنیم
+            if git rev-parse -q --verify "refs/tags/${{ steps.ref.outputs.REF }}" >/dev/null; then
+              git checkout -f "tags/${{ steps.ref.outputs.REF }}"
+            else
+              git checkout -f "${{ steps.ref.outputs.REF }}" || git checkout -f -B "${{ steps.ref.outputs.REF }}"
+              git reset --hard "origin/${{ steps.ref.outputs.REF }}" || true
+            fi
+            git submodule update --init --recursive || true
+
+            echo ">>> Backend deps (no-dev) & optimize"
+            composer install --no-interaction --no-progress --prefer-dist --no-dev
+            php artisan config:clear || true
+            php artisan cache:clear || true
+
+            echo ">>> Frontend build (Vite)"
+            if [ -d frontend ]; then
+              cd frontend
+              npm ci
+              npm run build
+              rsync -a dist/ ../public/spa/
+              cd ..
+            fi
+
+            echo ">>> Migrate & optimize"
+            php artisan migrate --force
+            php artisan route:cache || true
+            php artisan config:cache || true
+            php artisan view:cache || true
+
+            echo ">>> Permissions"
+            chown -R www-data:www-data storage bootstrap/cache public/spa || true
+            find storage -type d -exec chmod 775 {} \; || true
+            find storage -type f -exec chmod 664 {} \; || true
+
+            echo ">>> Reload services"
+            systemctl reload php8.2-fpm || true
+            systemctl reload nginx || true
+
+            echo ">>> DONE"
