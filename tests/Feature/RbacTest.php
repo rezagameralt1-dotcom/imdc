@@ -7,63 +7,74 @@ use Tests\TestCase;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 
 class RbacTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_admin_can_access_admin_ping_and_user_cannot()
+    protected User $admin;
+    protected User $user;
+
+    protected function setUp(): void
     {
-        $this->artisan('migrate');
+        parent::setUp();
 
-        // نقش‌ها
-        Role::firstOrCreate(['name' => 'Admin']);
-        Role::firstOrCreate(['name' => 'User']);
+        // همیشه کش پرمیژن‌ها را خالی کن تا تست‌ها ایزوله باشند
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        // ادمین
-        $admin = User::factory()->create([
+        // پرمیژن‌ها و نقش‌ها با guard 'sanctum'
+        Permission::findOrCreate('system.view', 'sanctum');
+        Permission::findOrCreate('orders.read', 'sanctum');
+        Role::findOrCreate('Admin', 'sanctum');
+        Role::findOrCreate('User', 'sanctum');
+
+        // ساخت یوزرها
+        $this->admin = User::factory()->create([
             'email' => 'admin@test.local',
             'password' => Hash::make('secret123'),
         ]);
-        $admin->syncRoles(['Admin']);
-
-        // کاربر معمولی
-        $user = User::factory()->create([
+        $this->user = User::factory()->create([
             'email' => 'user@test.local',
             'password' => Hash::make('secret123'),
         ]);
-        $user->syncRoles(['User']);
-        $user->syncPermissions(['system.view']);
 
-        // توکن ادمین
-        $adminLogin = $this->postJson('/api/auth/login', [
-            'email' => 'admin@test.local',
-            'password' => 'secret123',
-        ])->assertStatus(200)->json('data');
-        $adminToken = $adminLogin['token'];
+        // اتصال نقش‌ها و پرمیژن‌ها
+        $this->admin->syncRoles(['Admin']);
+        $this->admin->syncPermissions(['system.view', 'orders.read']);
 
-        // توکن کاربر معمولی
-        $userLogin = $this->postJson('/api/auth/login', [
-            'email' => 'user@test.local',
-            'password' => 'secret123',
-        ])->assertStatus(200)->json('data');
-        $userToken = $userLogin['token'];
+        $this->user->syncRoles(['User']);
+        $this->user->syncPermissions(['system.view']);
+    }
 
-        // Admin -> admin/ping = 200
-        $this->withHeader('Authorization', 'Bearer '.$adminToken)
+    public function test_admin_can_access_admin_ping_and_user_cannot(): void
+    {
+        // Admin → 200 روی /api/admin/ping
+        $this->actingAs($this->admin, 'sanctum')
             ->getJson('/api/admin/ping')
-            ->assertStatus(200)
-            ->assertJsonPath('data', 'admin-pong');
+            ->assertOk()
+            ->assertJsonPath('success', true);
 
-        // User -> admin/ping = 403
-        $this->withHeader('Authorization', 'Bearer '.$userToken)
+        // User → 403 روی /api/admin/ping
+        $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/admin/ping')
-            ->assertStatus(403);
+            ->assertForbidden();
+    }
 
-        // User -> perm/ping = 200 (system.view دارد)
-        $this->withHeader('Authorization', 'Bearer '.$userToken)
+    public function test_user_with_permission_can_access_perm_ping(): void
+    {
+        // User که system.view دارد → 200 روی /api/perm/ping
+        $this->actingAs($this->user, 'sanctum')
             ->getJson('/api/perm/ping')
-            ->assertStatus(200)
+            ->assertOk()
             ->assertJsonPath('data', 'perm-pong');
+    }
+
+    public function test_guest_cannot_access_protected_routes(): void
+    {
+        // مهمان → 401 روی هر دو روت محافظت‌شده
+        $this->getJson('/api/admin/ping')->assertUnauthorized();
+        $this->getJson('/api/perm/ping')->assertUnauthorized();
     }
 }
