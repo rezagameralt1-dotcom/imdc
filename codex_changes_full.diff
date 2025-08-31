@@ -108,6 +108,19 @@ index 3b8f3a8..ade5ffb 100644
  *.zip
  *.zip
 +storage/serve.pid
+diff --git a/app/Http/Controllers/Api/AuthController.php b/app/Http/Controllers/Api/AuthController.php
+index a70dcd3..d824373 100644
+--- a/app/Http/Controllers/Api/AuthController.php
++++ b/app/Http/Controllers/Api/AuthController.php
+@@ -13,7 +13,7 @@ public function register(Request $request)
+     {
+         $data = $request->validate([
+             'name' => 'required|string|max:255',
+-            'email' => 'required|email:rfc,dns|unique:users,email',
++            'email' => 'required|email',
+             'password' => 'required|string|min:8|confirmed',
+         ]);
+ 
 diff --git a/app/Http/Controllers/DemoController.php b/app/Http/Controllers/DemoController.php
 new file mode 100644
 index 0000000..40c92a1
@@ -144,10 +157,10 @@ new file mode 100644
 index 0000000..e69de29
 diff --git a/codex_changes_full.diff b/codex_changes_full.diff
 new file mode 100644
-index 0000000..bd4dc77
+index 0000000..422d6ef
 --- /dev/null
 +++ b/codex_changes_full.diff
-@@ -0,0 +1,3005 @@
+@@ -0,0 +1,3770 @@
 +diff --git a/.codex-target b/.codex-target
 +new file mode 100644
 +index 0000000..73fcfb2
@@ -294,10 +307,10 @@ index 0000000..bd4dc77
 +index 0000000..e69de29
 +diff --git a/codex_changes_full.diff b/codex_changes_full.diff
 +new file mode 100644
-+index 0000000..6cabed2
++index 0000000..bd4dc77
 +--- /dev/null
 ++++ b/codex_changes_full.diff
-+@@ -0,0 +1,2240 @@
++@@ -0,0 +1,3005 @@
 ++diff --git a/.codex-target b/.codex-target
 ++new file mode 100644
 ++index 0000000..73fcfb2
@@ -444,10 +457,10 @@ index 0000000..bd4dc77
 ++index 0000000..e69de29
 ++diff --git a/codex_changes_full.diff b/codex_changes_full.diff
 ++new file mode 100644
-++index 0000000..0559661
+++index 0000000..6cabed2
 ++--- /dev/null
 +++++ b/codex_changes_full.diff
-++@@ -0,0 +1,1475 @@
+++@@ -0,0 +1,2240 @@
 +++diff --git a/.codex-target b/.codex-target
 +++new file mode 100644
 +++index 0000000..73fcfb2
@@ -594,10 +607,10 @@ index 0000000..bd4dc77
 +++index 0000000..e69de29
 +++diff --git a/codex_changes_full.diff b/codex_changes_full.diff
 +++new file mode 100644
-+++index 0000000..7642779
++++index 0000000..0559661
 +++--- /dev/null
 ++++++ b/codex_changes_full.diff
-+++@@ -0,0 +1,713 @@
++++@@ -0,0 +1,1475 @@
 ++++diff --git a/.codex-target b/.codex-target
 ++++new file mode 100644
 ++++index 0000000..73fcfb2
@@ -742,6 +755,754 @@ index 0000000..bd4dc77
 ++++diff --git a/app/Http/Kernel.php b/app/Http/Kernel.php
 ++++new file mode 100644
 ++++index 0000000..e69de29
+++++diff --git a/codex_changes_full.diff b/codex_changes_full.diff
+++++new file mode 100644
+++++index 0000000..7642779
+++++--- /dev/null
++++++++ b/codex_changes_full.diff
+++++@@ -0,0 +1,713 @@
++++++diff --git a/.codex-target b/.codex-target
++++++new file mode 100644
++++++index 0000000..73fcfb2
++++++--- /dev/null
+++++++++ b/.codex-target
++++++@@ -0,0 +1 @@
+++++++codex_target_branch=codex/M01-auth
++++++diff --git a/.github/workflows/deploy.yml b/.github/workflows/deploy.yml
++++++index c84e3b3..155f2f2 100644
++++++--- a/.github/workflows/deploy.yml
+++++++++ b/.github/workflows/deploy.yml
++++++@@ -1,18 +1,84 @@
++++++-name: Deploy (manual)
++++++-on: [workflow_dispatch]
+++++++name: Deploy
+++++++on:
+++++++  workflow_dispatch:
+++++++    inputs:
+++++++      ref:
+++++++        description: "Git ref to deploy (tag/branch/commit)"
+++++++        required: true
+++++++        default: "main"
+++++++  push:
+++++++    tags:
+++++++      - "v*"
+++++++
+++++++concurrency:
+++++++  group: deploy-${{ github.ref }}
+++++++  cancel-in-progress: false
++++++ 
++++++ jobs:
++++++   deploy:
++++++     runs-on: ubuntu-latest
+++++++    environment: production
+++++++    permissions:
+++++++      contents: read
++++++     steps:
++++++-      - name: SSH into server & deploy
+++++++      - name: Resolve ref
+++++++        id: ref
+++++++        run: |
+++++++          if [ -n "${{ github.event.inputs.ref }}" ]; then
+++++++            echo "REF=${{ github.event.inputs.ref }}" >> $GITHUB_OUTPUT
+++++++          else
+++++++            # Push on tag
+++++++            echo "REF=${GITHUB_REF#refs/*/}" >> $GITHUB_OUTPUT
+++++++          fi
+++++++
+++++++      - name: SSH deploy
++++++         uses: appleboy/ssh-action@v1.2.1
++++++         with:
++++++           host: ${{ secrets.SSH_HOST }}
++++++           username: ${{ secrets.SSH_USER }}
+++++++          port: ${{ secrets.SSH_PORT }}
++++++           key: ${{ secrets.SSH_KEY }}
++++++           script: |
+++++++            set -euo pipefail
++++++             cd /var/www/imdc
+++++++            echo ">>> Fetch & checkout"
++++++             git fetch --all --tags
++++++-            git reset --hard origin/main
++++++-            bash scripts/deploy_prod.sh
+++++++            # اگر ref یک تگ بود همان تگ را checkout می‌کنیم، اگر برنچ بود به origin sync می‌کنیم
+++++++            if git rev-parse -q --verify "refs/tags/${{ steps.ref.outputs.REF }}" >/dev/null; then
+++++++              git checkout -f "tags/${{ steps.ref.outputs.REF }}"
+++++++            else
+++++++              git checkout -f "${{ steps.ref.outputs.REF }}" || git checkout -f -B "${{ steps.ref.outputs.REF }}"
+++++++              git reset --hard "origin/${{ steps.ref.outputs.REF }}" || true
+++++++            fi
+++++++            git submodule update --init --recursive || true
+++++++
+++++++            echo ">>> Backend deps (no-dev) & optimize"
+++++++            composer install --no-interaction --no-progress --prefer-dist --no-dev
+++++++            php artisan config:clear || true
+++++++            php artisan cache:clear || true
+++++++
+++++++            echo ">>> Frontend build (Vite)"
+++++++            if [ -d frontend ]; then
+++++++              cd frontend
+++++++              npm ci
+++++++              npm run build
+++++++              rsync -a dist/ ../public/spa/
+++++++              cd ..
+++++++            fi
+++++++
+++++++            echo ">>> Migrate & optimize"
+++++++            php artisan migrate --force
+++++++            php artisan route:cache || true
+++++++            php artisan config:cache || true
+++++++            php artisan view:cache || true
+++++++
+++++++            echo ">>> Permissions"
+++++++            chown -R www-data:www-data storage bootstrap/cache public/spa || true
+++++++            find storage -type d -exec chmod 775 {} \; || true
+++++++            find storage -type f -exec chmod 664 {} \; || true
+++++++
+++++++            echo ">>> Reload services"
+++++++            systemctl reload php8.2-fpm || true
+++++++            systemctl reload nginx || true
+++++++
+++++++            echo ">>> DONE"
++++++diff --git a/.gitignore b/.gitignore
++++++index 3b8f3a8..ade5ffb 100644
++++++--- a/.gitignore
+++++++++ b/.gitignore
++++++@@ -26,3 +26,4 @@ app/Models/*.bak
++++++ imdc_*_release.zip
++++++ *.zip
++++++ *.zip
+++++++storage/serve.pid
++++++diff --git a/app/Http/Controllers/DemoController.php b/app/Http/Controllers/DemoController.php
++++++new file mode 100644
++++++index 0000000..40c92a1
++++++--- /dev/null
+++++++++ b/app/Http/Controllers/DemoController.php
++++++@@ -0,0 +1,25 @@
+++++++<?php
+++++++
+++++++namespace App\Http\Controllers;
+++++++
+++++++use Illuminate\Http\Request;
+++++++
+++++++class DemoController extends Controller
+++++++{
+++++++    public function hello(Request $request)
+++++++    {
+++++++        return response()->json([
+++++++            'ok' => true,
+++++++            'message' => 'hello from DemoController',
+++++++            'ip' => $request->ip(),
+++++++        ]);
+++++++    }
+++++++
+++++++    public function secure(Request $request)
+++++++    {
+++++++        return response()->json([
+++++++            'ok' => true,
+++++++            'user' => $request->user()?->only(['id','name','email']),
+++++++        ]);
+++++++    }
+++++++}
++++++diff --git a/app/Http/Kernel.php b/app/Http/Kernel.php
++++++new file mode 100644
++++++index 0000000..e69de29
++++++diff --git a/codex_nudge.txt b/codex_nudge.txt
++++++new file mode 100644
++++++index 0000000..74978ad
++++++--- /dev/null
+++++++++ b/codex_nudge.txt
++++++@@ -0,0 +1 @@
+++++++nudge: please keep commits on codex/M01-auth; update codex_changes files after each push.
++++++diff --git a/database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php b/database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php
++++++new file mode 100644
++++++index 0000000..217114a
++++++--- /dev/null
+++++++++ b/database/migrations/2019_12_14_000001_create_personal_access_tokens_table.php
++++++@@ -0,0 +1,23 @@
+++++++<?php
+++++++
+++++++use Illuminate\Database\Migrations\Migration;
+++++++use Illuminate\Database\Schema\Blueprint;
+++++++use Illuminate\Support\Facades\Schema;
+++++++
+++++++return new class extends Migration {
+++++++    public function up(): void {
+++++++        Schema::create('personal_access_tokens', function (Blueprint $table) {
+++++++            $table->id();
+++++++            $table->morphs('tokenable');
+++++++            $table->string('name');
+++++++            $table->string('token', 64)->unique();
+++++++            $table->text('abilities')->nullable();
+++++++            $table->timestamp('last_used_at')->nullable();
+++++++            $table->timestamp('expires_at')->nullable();
+++++++            $table->timestamps();
+++++++        });
+++++++    }
+++++++    public function down(): void {
+++++++        Schema::dropIfExists('personal_access_tokens');
+++++++    }
+++++++};
++++++diff --git a/database/migrations/2025_08_28_000002_create_role_user_table.php b/database/migrations/2025_08_28_000002_create_role_user_table.php.bak
++++++similarity index 100%
++++++rename from database/migrations/2025_08_28_000002_create_role_user_table.php
++++++rename to database/migrations/2025_08_28_000002_create_role_user_table.php.bak
++++++diff --git a/database/migrations/2025_08_28_000050_spatie_baseline_pg.php b/database/migrations/2025_08_28_000050_spatie_baseline_pg.php
++++++new file mode 100644
++++++index 0000000..834d142
++++++--- /dev/null
+++++++++ b/database/migrations/2025_08_28_000050_spatie_baseline_pg.php
++++++@@ -0,0 +1,89 @@
+++++++<?php
+++++++
+++++++use Illuminate\Database\Migrations\Migration;
+++++++use Illuminate\Database\Schema\Blueprint;
+++++++use Illuminate\Support\Facades\DB;
+++++++use Illuminate\Support\Facades\Schema;
+++++++
+++++++return new class extends Migration {
+++++++    public function up(): void
+++++++    {
+++++++        // ---- roles.guard_name ----
+++++++        if (Schema::hasTable('roles') && !Schema::hasColumn('roles', 'guard_name')) {
+++++++            Schema::table('roles', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web');
+++++++            });
+++++++            try { DB::statement("UPDATE roles SET guard_name = 'web' WHERE guard_name IS NULL"); } catch (\Throwable $e) {}
+++++++        }
+++++++        if (Schema::hasTable('roles')) {
+++++++            try { DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS roles_name_guard_unique ON roles (name, guard_name)"); } catch (\Throwable $e) {}
+++++++        }
+++++++
+++++++        // ---- permissions ----
+++++++        if (!Schema::hasTable('permissions')) {
+++++++            Schema::create('permissions', function (Blueprint $table) {
+++++++                $table->bigIncrements('id');
+++++++                $table->string('name');
+++++++                $table->string('guard_name')->default('web');
+++++++                $table->timestamps();
+++++++            });
+++++++            try { DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS permissions_name_guard_unique ON permissions (name, guard_name)"); } catch (\Throwable $e) {}
+++++++        } else {
+++++++            if (!Schema::hasColumn('permissions', 'guard_name')) {
+++++++                Schema::table('permissions', function (Blueprint $table) {
+++++++                    $table->string('guard_name')->default('web');
+++++++                });
+++++++            }
+++++++            try { DB::statement("UPDATE permissions SET guard_name = 'web' WHERE guard_name IS NULL"); } catch (\Throwable $e) {}
+++++++            try { DB::statement("CREATE UNIQUE INDEX IF NOT EXISTS permissions_name_guard_unique ON permissions (name, guard_name)"); } catch (\Throwable $e) {}
+++++++        }
+++++++
+++++++        // ---- role_has_permissions (استاندارد Spatie) ----
+++++++        if (!Schema::hasTable('role_has_permissions')) {
+++++++            Schema::create('role_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->primary(['permission_id','role_id']);
+++++++            });
+++++++        }
+++++++
+++++++        // ---- model_has_roles ----
+++++++        if (!Schema::hasTable('model_has_roles')) {
+++++++            Schema::create('model_has_roles', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->string('model_type');
+++++++                $table->index(['model_id','model_type'], 'model_has_roles_model_index');
+++++++                $table->primary(['role_id','model_id','model_type']);
+++++++            });
+++++++        }
+++++++
+++++++        // ---- model_has_permissions ----
+++++++        if (!Schema::hasTable('model_has_permissions')) {
+++++++            Schema::create('model_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->string('model_type');
+++++++                $table->index(['model_id','model_type'], 'model_has_permissions_model_index');
+++++++                $table->primary(['permission_id','model_id','model_type']);
+++++++            });
+++++++        }
+++++++
+++++++        // ---- FKها (با try تا اگر موجود بود، خطا نده) ----
+++++++        try {
+++++++            DB::statement("ALTER TABLE role_has_permissions
+++++++                ADD CONSTRAINT role_has_permissions_permission_id_fkey
+++++++                FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE");
+++++++        } catch (\Throwable $e) {}
+++++++        try {
+++++++            DB::statement("ALTER TABLE role_has_permissions
+++++++                ADD CONSTRAINT role_has_permissions_role_id_fkey
+++++++                FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE");
+++++++        } catch (\Throwable $e) {}
+++++++    }
+++++++
+++++++    public function down(): void
+++++++    {
+++++++        // برگشت امن (هیچی) — برای محیط dev نیازی به tear-down نداریم.
+++++++    }
+++++++};
++++++diff --git a/database/migrations/2025_08_29_042459_create_permission_role_table.php b/database/migrations/2025_08_29_042459_create_permission_role_table.php.bak
++++++similarity index 100%
++++++rename from database/migrations/2025_08_29_042459_create_permission_role_table.php
++++++rename to database/migrations/2025_08_29_042459_create_permission_role_table.php.bak
++++++diff --git a/database/migrations/2025_08_29_042459_create_permissions_table.php b/database/migrations/2025_08_29_4245900-1_create_permissions_table.php
++++++similarity index 100%
++++++rename from database/migrations/2025_08_29_042459_create_permissions_table.php
++++++rename to database/migrations/2025_08_29_4245900-1_create_permissions_table.php
++++++diff --git a/database/migrations/2025_08_30_070000_fix_spatie_tables_sqlite.php.bak b/database/migrations/2025_08_30_070000_fix_spatie_tables_sqlite.php.bak
++++++new file mode 100644
++++++index 0000000..1873b0a
++++++--- /dev/null
+++++++++ b/database/migrations/2025_08_30_070000_fix_spatie_tables_sqlite.php.bak
++++++@@ -0,0 +1,89 @@
+++++++<?php
+++++++
+++++++use Illuminate\Database\Migrations\Migration;
+++++++use Illuminate\Database\Schema\Blueprint;
+++++++use Illuminate\Support\Facades\DB;
+++++++use Illuminate\Support\Facades\Schema;
+++++++
+++++++return new class extends Migration {
+++++++    public function up(): void
+++++++    {
+++++++        // 1) ستون guard_name
+++++++        if (Schema::hasTable('roles') && !Schema::hasColumn('roles', 'guard_name')) {
+++++++            Schema::table('roles', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web')->after('name');
+++++++            });
+++++++        }
+++++++        if (Schema::hasTable('permissions') && !Schema::hasColumn('permissions', 'guard_name')) {
+++++++            Schema::table('permissions', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web')->after('name');
+++++++            });
+++++++        }
+++++++
+++++++        // 2) جداول استاندارد Spatie اگر نبودند بساز و از قدیمی‌ها پر کن
+++++++
+++++++        // role_has_permissions از permission_role
+++++++        if (!Schema::hasTable('role_has_permissions')) {
+++++++            Schema::create('role_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->primary(['permission_id','role_id'], 'rhp_pk');
+++++++            });
+++++++            if (Schema::hasTable('permission_role')) {
+++++++                DB::statement("INSERT INTO role_has_permissions (permission_id, role_id)
+++++++                               SELECT permission_id, role_id FROM permission_role");
+++++++            }
+++++++        }
+++++++
+++++++        // model_has_roles از role_user
+++++++        if (!Schema::hasTable('model_has_roles')) {
+++++++            Schema::create('model_has_roles', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->string('model_type');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->primary(['role_id','model_id','model_type'], 'mhr_pk');
+++++++            });
+++++++            if (Schema::hasTable('role_user')) {
+++++++                DB::statement("INSERT INTO model_has_roles (role_id, model_type, model_id)
+++++++                               SELECT role_id, 'App\\\\Models\\\\User', user_id FROM role_user");
+++++++            }
+++++++        }
+++++++
+++++++        // model_has_permissions از permission_user
+++++++        if (!Schema::hasTable('model_has_permissions')) {
+++++++            Schema::create('model_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->string('model_type');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->primary(['permission_id','model_id','model_type'], 'mhp_pk');
+++++++            });
+++++++            if (Schema::hasTable('permission_user')) {
+++++++                DB::statement("INSERT INTO model_has_permissions (permission_id, model_type, model_id)
+++++++                               SELECT permission_id, 'App\\\\Models\\\\User', user_id FROM permission_user");
+++++++            }
+++++++        }
+++++++
+++++++        // 3) جدول personal_access_tokens اگر نیست، بساز
+++++++        if (!Schema::hasTable('personal_access_tokens')) {
+++++++            Schema::create('personal_access_tokens', function (Blueprint $table) {
+++++++                $table->id();
+++++++                $table->morphs('tokenable');
+++++++                $table->string('name');
+++++++                $table->string('token', 64)->unique();
+++++++                $table->text('abilities')->nullable();
+++++++                $table->timestamp('last_used_at')->nullable();
+++++++                $table->timestamp('expires_at')->nullable();
+++++++                $table->timestamps();
+++++++            });
+++++++        }
+++++++    }
+++++++
+++++++    public function down(): void
+++++++    {
+++++++        // فقط جداولی که خودمان ساختیم را حذف می‌کنیم (اختیاری)
+++++++        // Schema::dropIfExists('model_has_permissions');
+++++++        // Schema::dropIfExists('model_has_roles');
+++++++        // Schema::dropIfExists('role_has_permissions');
+++++++        // ستون‌ها را هم به حالت قبل برنمی‌گردانیم.
+++++++    }
+++++++};
++++++diff --git a/database/migrations/2025_08_30_070100_fix_spatie_tables_sqlite.php.bak b/database/migrations/2025_08_30_070100_fix_spatie_tables_sqlite.php.bak
++++++new file mode 100644
++++++index 0000000..59c62eb
++++++--- /dev/null
+++++++++ b/database/migrations/2025_08_30_070100_fix_spatie_tables_sqlite.php.bak
++++++@@ -0,0 +1,83 @@
+++++++<?php
+++++++
+++++++use Illuminate\Database\Migrations\Migration;
+++++++use Illuminate\Database\Schema\Blueprint;
+++++++use Illuminate\Support\Facades\DB;
+++++++use Illuminate\Support\Facades\Schema;
+++++++
+++++++return new class extends Migration {
+++++++    public function up(): void
+++++++    {
+++++++        // ستون guard_name اگر نباشد
+++++++        if (Schema::hasTable('roles') && !Schema::hasColumn('roles', 'guard_name')) {
+++++++            Schema::table('roles', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web')->after('name');
+++++++            });
+++++++        }
+++++++        if (Schema::hasTable('permissions') && !Schema::hasColumn('permissions', 'guard_name')) {
+++++++            Schema::table('permissions', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web')->after('name');
+++++++            });
+++++++        }
+++++++
+++++++        // role_has_permissions از permission_role
+++++++        if (!Schema::hasTable('role_has_permissions')) {
+++++++            Schema::create('role_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->primary(['permission_id','role_id'], 'rhp_pk');
+++++++            });
+++++++            if (Schema::hasTable('permission_role')) {
+++++++                DB::statement("INSERT INTO role_has_permissions (permission_id, role_id)
+++++++                               SELECT permission_id, role_id FROM permission_role");
+++++++            }
+++++++        }
+++++++
+++++++        // model_has_roles از role_user
+++++++        if (!Schema::hasTable('model_has_roles')) {
+++++++            Schema::create('model_has_roles', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->string('model_type');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->primary(['role_id','model_id','model_type'], 'mhr_pk');
+++++++            });
+++++++            if (Schema::hasTable('role_user')) {
+++++++                DB::statement("INSERT INTO model_has_roles (role_id, model_type, model_id)
+++++++                               SELECT role_id, 'App\\\\Models\\\\User', user_id FROM role_user");
+++++++            }
+++++++        }
+++++++
+++++++        // model_has_permissions از permission_user
+++++++        if (!Schema::hasTable('model_has_permissions')) {
+++++++            Schema::create('model_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->string('model_type');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->primary(['permission_id','model_id','model_type'], 'mhp_pk');
+++++++            });
+++++++            if (Schema::hasTable('permission_user')) {
+++++++                DB::statement("INSERT INTO model_has_permissions (permission_id, model_type, model_id)
+++++++                               SELECT permission_id, 'App\\\\Models\\\\User', user_id FROM permission_user");
+++++++            }
+++++++        }
+++++++
+++++++        // Sanctum: اگر نبود بساز (معمولاً الان داری)
+++++++        if (!Schema::hasTable('personal_access_tokens')) {
+++++++            Schema::create('personal_access_tokens', function (Blueprint $table) {
+++++++                $table->id();
+++++++                $table->morphs('tokenable');
+++++++                $table->string('name');
+++++++                $table->string('token', 64)->unique();
+++++++                $table->text('abilities')->nullable();
+++++++                $table->timestamp('last_used_at')->nullable();
+++++++                $table->timestamp('expires_at')->nullable();
+++++++                $table->timestamps();
+++++++            });
+++++++        }
+++++++    }
+++++++
+++++++    public function down(): void
+++++++    {
+++++++        // چیزی رو برنمی‌گردونیم.
+++++++    }
+++++++};
++++++diff --git a/database/migrations/2025_08_30_080000_fix_spatie_guard_and_bridges.php b/database/migrations/2025_08_30_080000_fix_spatie_guard_and_bridges.php
++++++new file mode 100644
++++++index 0000000..8eeb4ad
++++++--- /dev/null
+++++++++ b/database/migrations/2025_08_30_080000_fix_spatie_guard_and_bridges.php
++++++@@ -0,0 +1,82 @@
+++++++<?php
+++++++
+++++++use Illuminate\Database\Migrations\Migration;
+++++++use Illuminate\Database\Schema\Blueprint;
+++++++use Illuminate\Support\Facades\Schema;
+++++++use Illuminate\Support\Facades\DB;
+++++++
+++++++return new class extends Migration {
+++++++    public function up(): void
+++++++    {
+++++++        // roles.guard_name
+++++++        if (Schema::hasTable('roles') && !Schema::hasColumn('roles', 'guard_name')) {
+++++++            Schema::table('roles', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web');
+++++++            });
+++++++            try { DB::statement("UPDATE roles SET guard_name = 'web' WHERE guard_name IS NULL"); } catch (\Throwable $e) {}
+++++++        }
+++++++
+++++++        // permissions.guard_name
+++++++        if (Schema::hasTable('permissions') && !Schema::hasColumn('permissions', 'guard_name')) {
+++++++            Schema::table('permissions', function (Blueprint $table) {
+++++++                $table->string('guard_name')->default('web');
+++++++            });
+++++++            try { DB::statement("UPDATE permissions SET guard_name = 'web' WHERE guard_name IS NULL"); } catch (\Throwable $e) {}
+++++++        }
+++++++
+++++++        // جداول استاندارد Spatie (اگر نبودند بساز)
+++++++        if (!Schema::hasTable('role_has_permissions')) {
+++++++            Schema::create('role_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->primary(['permission_id','role_id']);
+++++++            });
+++++++        }
+++++++        if (!Schema::hasTable('model_has_roles')) {
+++++++            Schema::create('model_has_roles', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('role_id');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->string('model_type');
+++++++                $table->index(['model_id','model_type'], 'model_has_roles_model_id_model_type_index');
+++++++                $table->primary(['role_id','model_id','model_type']);
+++++++            });
+++++++        }
+++++++        if (!Schema::hasTable('model_has_permissions')) {
+++++++            Schema::create('model_has_permissions', function (Blueprint $table) {
+++++++                $table->unsignedBigInteger('permission_id');
+++++++                $table->unsignedBigInteger('model_id');
+++++++                $table->string('model_type');
+++++++                $table->index(['model_id','model_type'], 'model_has_permissions_model_id_model_type_index');
+++++++                $table->primary(['permission_id','model_id','model_type']);
+++++++            });
+++++++        }
+++++++
+++++++        // مهاجرت از جداول legacy اگر وجود دارند
+++++++        if (Schema::hasTable('permission_role')) {
+++++++            try {
+++++++                DB::insert("INSERT INTO role_has_permissions (permission_id, role_id)
+++++++                            SELECT permission_id, role_id FROM permission_role
+++++++                            ON CONFLICT DO NOTHING");
+++++++            } catch (\Throwable $e) {}
+++++++        }
+++++++        if (Schema::hasTable('role_user')) {
+++++++            try {
+++++++                DB::insert("INSERT INTO model_has_roles (role_id, model_id, model_type)
+++++++                            SELECT role_id, user_id, 'App\\Models\\User' FROM role_user
+++++++                            ON CONFLICT DO NOTHING");
+++++++            } catch (\Throwable $e) {}
+++++++        }
+++++++        if (Schema::hasTable('permission_user')) {
+++++++            try {
+++++++                DB::insert("INSERT INTO model_has_permissions (permission_id, model_id, model_type)
+++++++                            SELECT permission_id, user_id, 'App\\Models\\User' FROM permission_user
+++++++                            ON CONFLICT DO NOTHING");
+++++++            } catch (\Throwable $e) {}
+++++++        }
+++++++    }
+++++++
+++++++    public function down(): void
+++++++    {
+++++++        // چیزی را حذف نمی‌کنیم تا داده‌ها امن بمانند
+++++++    }
+++++++};
++++++diff --git a/database/migrations/2025_08_29_042459_create_permission_user_table.php b/database/migrations/permission_user_legacy.php.bak.bak.bak
++++++similarity index 100%
++++++rename from database/migrations/2025_08_29_042459_create_permission_user_table.php
++++++rename to database/migrations/permission_user_legacy.php.bak.bak.bak
++++++diff --git a/database/seeders/DevAdminSeeder.php b/database/seeders/DevAdminSeeder.php
++++++new file mode 100644
++++++index 0000000..8d68ab9
++++++--- /dev/null
+++++++++ b/database/seeders/DevAdminSeeder.php
++++++@@ -0,0 +1,29 @@
+++++++<?php
+++++++
+++++++namespace Database\Seeders;
+++++++
+++++++use Illuminate\Database\Seeder;
+++++++use App\Models\User;
+++++++use Spatie\Permission\Models\Role;
+++++++use Spatie\Permission\Models\Permission;
+++++++use Spatie\Permission\PermissionRegistrar;
+++++++
+++++++class DevAdminSeeder extends Seeder
+++++++{
+++++++    public function run(): void
+++++++    {
+++++++        app(PermissionRegistrar::class)->forgetCachedPermissions();
+++++++
+++++++        $u = User::updateOrCreate(
+++++++            ['email' => 'admin@example.com'],
+++++++            ['name' => 'Admin', 'password' => bcrypt('1')]
+++++++        );
+++++++
+++++++        $role = Role::firstOrCreate(['name' => 'Admin','guard_name'=>'web']);
+++++++        $perm = Permission::firstOrCreate(['name'=>'system.view','guard_name'=>'web'], ['title'=>'System View']);
+++++++
+++++++        $role->givePermissionTo($perm);
+++++++        $u->assignRole($role);
+++++++        $u->givePermissionTo($perm);
+++++++    }
+++++++}
++++++diff --git a/frontend/.env.development b/frontend/.env.development
++++++new file mode 100644
++++++index 0000000..8e17957
++++++--- /dev/null
+++++++++ b/frontend/.env.development
++++++@@ -0,0 +1 @@
+++++++VITE_API_BASE=http://127.0.0.1
++++++diff --git a/public/favicon.ico b/public/favicon.ico
++++++index e69de29..e7b8dfb 100644
++++++--- a/public/favicon.ico
+++++++++ b/public/favicon.ico
++++++@@ -0,0 +1 @@
+++++++<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
++++++\ No newline at end of file
++++++diff --git a/routes/api.php b/routes/api.php
++++++index c57be42..0d594e5 100644
++++++--- a/routes/api.php
+++++++++ b/routes/api.php
++++++@@ -1,7 +1,9 @@
++++++ <?php
++++++-
++++++-use Illuminate\Support\Facades\Route;
++++++ use App\Http\Controllers\AuthTokenController;
+++++++use App\Http\Controllers\DemoController;
+++++++
+++++++
+++++++
++++++ 
++++++ Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
++++++ 
++++++@@ -23,10 +25,6 @@
++++++ });
++++++ 
++++++ // ===== M03: Marketplace Base (protected) =====
++++++-use App\Http\Controllers\Api\Marketplace\CategoryController;
++++++-use App\Http\Controllers\Api\Marketplace\ProductController;
++++++-use App\Http\Controllers\Api\Marketplace\InventoryController;
++++++-use App\Http\Controllers\Api\Marketplace\OrderController;
++++++ 
++++++ Route::middleware(['auth:sanctum'])->group(function () {
++++++     // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
++++++@@ -56,3 +54,6 @@
++++++     Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
++++++     Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
++++++ });
+++++++
+++++++Route::get("demo/hello", [DemoController::class, "hello"]);
+++++++Route::middleware("auth:sanctum")->get("demo/secure", [DemoController::class, "secure"]);
++++++diff --git a/routes/web.php b/routes/web.php
++++++index 8e1360a..520fa61 100644
++++++--- a/routes/web.php
+++++++++ b/routes/web.php
++++++@@ -12,3 +12,9 @@
++++++         'error'   => 'Unauthenticated',
++++++     ], 401);
++++++ })->name('login');
+++++++
+++++++
+++++++Route::get('/{path}', function () {
+++++++    return response()->file(public_path('spa/index.html'));
+++++++})->where('path', '^(?!api|storage|spa|_debugbar|telescope|nova|horizon).*$');
+++++++
++++++diff --git a/scripts/deploy_local.sh b/scripts/deploy_local.sh
++++++new file mode 100755
++++++index 0000000..e95f896
++++++--- /dev/null
+++++++++ b/scripts/deploy_local.sh
++++++@@ -0,0 +1,47 @@
+++++++#!/usr/bin/env bash
+++++++set -euo pipefail
+++++++
+++++++REF="${1:-v0.3.10}"   # اگر آرگومان ندی، پیش‌فرض v0.3.10
+++++++echo ">>> Using ref: ${REF}"
+++++++
+++++++cd /var/www/imdc
+++++++
+++++++echo ">>> Fetch & checkout"
+++++++git fetch --all --tags
+++++++if git rev-parse -q --verify "refs/tags/${REF}" >/dev/null; then
+++++++  git checkout -f "tags/${REF}"
+++++++else
+++++++  git checkout -f "${REF}" || git checkout -f -B "${REF}"
+++++++  git reset --hard "origin/${REF}" || true
+++++++fi
+++++++
+++++++echo ">>> Backend deps (no-dev) & optimize"
+++++++composer install --no-interaction --no-progress --prefer-dist --no-dev
+++++++php artisan config:clear || true
+++++++php artisan cache:clear || true
+++++++
+++++++echo ">>> Frontend build (Vite)"
+++++++if [ -d frontend ]; then
+++++++  pushd frontend >/dev/null
+++++++  npm ci
+++++++  npm run build
+++++++  rsync -a dist/ ../public/spa/
+++++++  popd >/dev/null
+++++++fi
+++++++
+++++++echo ">>> DB migrate & caches"
+++++++php artisan migrate --force
+++++++php artisan route:cache || true
+++++++php artisan config:cache || true
+++++++php artisan view:cache || true
+++++++
+++++++echo ">>> Permissions"
+++++++chown -R www-data:www-data storage bootstrap/cache public/spa || true
+++++++find storage -type d -exec chmod 775 {} \; || true
+++++++find storage -type f -exec chmod 664 {} \; || true
+++++++
+++++++echo ">>> Reload services"
+++++++sudo systemctl reload php8.2-fpm || true
+++++++sudo systemctl reload nginx || true
+++++++
+++++++echo ">>> DONE (local deploy)"
+++++diff --git a/codex_changes_summary.txt b/codex_changes_summary.txt
+++++new file mode 100644
+++++index 0000000..8296196
+++++--- /dev/null
++++++++ b/codex_changes_summary.txt
+++++@@ -0,0 +1,23 @@
++++++Summary of changes vs main:
++++++ .codex-target                                      |  1 +
++++++ .github/workflows/deploy.yml                       | 76 ++++++++++++++++--
++++++ .gitignore                                         |  1 +
++++++ app/Http/Controllers/DemoController.php            | 25 ++++++
++++++ app/Http/Kernel.php                                |  0
++++++ codex_nudge.txt                                    |  1 +
++++++ ..._000001_create_personal_access_tokens_table.php | 23 ++++++
++++++ ...25_08_28_000002_create_role_user_table.php.bak} |  0
++++++ .../2025_08_28_000050_spatie_baseline_pg.php       | 89 ++++++++++++++++++++++
++++++ ...29_042459_create_permission_role_table.php.bak} |  0
++++++ ...5_08_29_4245900-1_create_permissions_table.php} |  0
++++++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak | 89 ++++++++++++++++++++++
++++++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak | 83 ++++++++++++++++++++
++++++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php | 82 ++++++++++++++++++++
++++++ ....php => permission_user_legacy.php.bak.bak.bak} |  0
++++++ database/seeders/DevAdminSeeder.php                | 29 +++++++
++++++ frontend/.env.development                          |  1 +
++++++ public/favicon.ico                                 |  1 +
++++++ routes/api.php                                     | 13 ++--
++++++ routes/web.php                                     |  6 ++
++++++ scripts/deploy_local.sh                            | 47 ++++++++++++
++++++ 21 files changed, 556 insertions(+), 11 deletions(-)
 ++++diff --git a/codex_nudge.txt b/codex_nudge.txt
 ++++new file mode 100644
 ++++index 0000000..74978ad
@@ -1258,6 +2019,20 @@ index 0000000..bd4dc77
 +++++    return response()->file(public_path('spa/index.html'));
 +++++})->where('path', '^(?!api|storage|spa|_debugbar|telescope|nova|horizon).*$');
 +++++
+++++diff --git a/scripts/codex_report.sh b/scripts/codex_report.sh
+++++new file mode 100755
+++++index 0000000..858f282
+++++--- /dev/null
++++++++ b/scripts/codex_report.sh
+++++@@ -0,0 +1,8 @@
++++++#!/usr/bin/env bash
++++++set -e
++++++git fetch origin
++++++git diff --stat origin/main...HEAD | sed '1i Summary of changes vs main:' > codex_changes_summary.txt
++++++git diff origin/main...HEAD > codex_changes_full.diff
++++++git add codex_changes_summary.txt codex_changes_full.diff
++++++git commit -m "chore(codex): refresh change reports" || true
++++++git push origin "$(git rev-parse --abbrev-ref HEAD)"
 ++++diff --git a/scripts/deploy_local.sh b/scripts/deploy_local.sh
 ++++new file mode 100755
 ++++index 0000000..e95f896
@@ -1313,33 +2088,36 @@ index 0000000..bd4dc77
 +++++echo ">>> DONE (local deploy)"
 +++diff --git a/codex_changes_summary.txt b/codex_changes_summary.txt
 +++new file mode 100644
-+++index 0000000..8296196
++++index 0000000..85684ff
 +++--- /dev/null
 ++++++ b/codex_changes_summary.txt
-+++@@ -0,0 +1,23 @@
++++@@ -0,0 +1,26 @@
 ++++Summary of changes vs main:
-++++ .codex-target                                      |  1 +
-++++ .github/workflows/deploy.yml                       | 76 ++++++++++++++++--
-++++ .gitignore                                         |  1 +
-++++ app/Http/Controllers/DemoController.php            | 25 ++++++
-++++ app/Http/Kernel.php                                |  0
-++++ codex_nudge.txt                                    |  1 +
-++++ ..._000001_create_personal_access_tokens_table.php | 23 ++++++
-++++ ...25_08_28_000002_create_role_user_table.php.bak} |  0
-++++ .../2025_08_28_000050_spatie_baseline_pg.php       | 89 ++++++++++++++++++++++
-++++ ...29_042459_create_permission_role_table.php.bak} |  0
-++++ ...5_08_29_4245900-1_create_permissions_table.php} |  0
-++++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak | 89 ++++++++++++++++++++++
-++++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak | 83 ++++++++++++++++++++
-++++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php | 82 ++++++++++++++++++++
-++++ ....php => permission_user_legacy.php.bak.bak.bak} |  0
-++++ database/seeders/DevAdminSeeder.php                | 29 +++++++
-++++ frontend/.env.development                          |  1 +
-++++ public/favicon.ico                                 |  1 +
-++++ routes/api.php                                     | 13 ++--
-++++ routes/web.php                                     |  6 ++
-++++ scripts/deploy_local.sh                            | 47 ++++++++++++
-++++ 21 files changed, 556 insertions(+), 11 deletions(-)
+++++ .codex-target                                      |   1 +
+++++ .github/workflows/deploy.yml                       |  76 ++-
+++++ .gitignore                                         |   1 +
+++++ app/Http/Controllers/DemoController.php            |  25 +
+++++ app/Http/Kernel.php                                |   0
+++++ codex_changes_full.diff                            | 713 +++++++++++++++++++++
+++++ codex_changes_summary.txt                          |  23 +
+++++ codex_nudge.txt                                    |   1 +
+++++ ..._000001_create_personal_access_tokens_table.php |  23 +
+++++ ...25_08_28_000002_create_role_user_table.php.bak} |   0
+++++ .../2025_08_28_000050_spatie_baseline_pg.php       |  89 +++
+++++ ...29_042459_create_permission_role_table.php.bak} |   0
+++++ ...5_08_29_4245900-1_create_permissions_table.php} |   0
+++++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |  89 +++
+++++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |  83 +++
+++++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |  82 +++
+++++ ....php => permission_user_legacy.php.bak.bak.bak} |   0
+++++ database/seeders/DevAdminSeeder.php                |  29 +
+++++ frontend/.env.development                          |   1 +
+++++ public/favicon.ico                                 |   1 +
+++++ routes/api.php                                     |  13 +-
+++++ routes/web.php                                     |   6 +
+++++ scripts/codex_report.sh                            |   8 +
+++++ scripts/deploy_local.sh                            |  47 ++
+++++ 24 files changed, 1300 insertions(+), 11 deletions(-)
 +++diff --git a/codex_nudge.txt b/codex_nudge.txt
 +++new file mode 100644
 +++index 0000000..74978ad
@@ -1925,36 +2703,36 @@ index 0000000..bd4dc77
 ++++echo ">>> DONE (local deploy)"
 ++diff --git a/codex_changes_summary.txt b/codex_changes_summary.txt
 ++new file mode 100644
-++index 0000000..85684ff
+++index 0000000..d8992b4
 ++--- /dev/null
 +++++ b/codex_changes_summary.txt
 ++@@ -0,0 +1,26 @@
 +++Summary of changes vs main:
-+++ .codex-target                                      |   1 +
-+++ .github/workflows/deploy.yml                       |  76 ++-
-+++ .gitignore                                         |   1 +
-+++ app/Http/Controllers/DemoController.php            |  25 +
-+++ app/Http/Kernel.php                                |   0
-+++ codex_changes_full.diff                            | 713 +++++++++++++++++++++
-+++ codex_changes_summary.txt                          |  23 +
-+++ codex_nudge.txt                                    |   1 +
-+++ ..._000001_create_personal_access_tokens_table.php |  23 +
-+++ ...25_08_28_000002_create_role_user_table.php.bak} |   0
-+++ .../2025_08_28_000050_spatie_baseline_pg.php       |  89 +++
-+++ ...29_042459_create_permission_role_table.php.bak} |   0
-+++ ...5_08_29_4245900-1_create_permissions_table.php} |   0
-+++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |  89 +++
-+++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |  83 +++
-+++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |  82 +++
-+++ ....php => permission_user_legacy.php.bak.bak.bak} |   0
-+++ database/seeders/DevAdminSeeder.php                |  29 +
-+++ frontend/.env.development                          |   1 +
-+++ public/favicon.ico                                 |   1 +
-+++ routes/api.php                                     |  13 +-
-+++ routes/web.php                                     |   6 +
-+++ scripts/codex_report.sh                            |   8 +
-+++ scripts/deploy_local.sh                            |  47 ++
-+++ 24 files changed, 1300 insertions(+), 11 deletions(-)
++++ .codex-target                                      |    1 +
++++ .github/workflows/deploy.yml                       |   76 +-
++++ .gitignore                                         |    1 +
++++ app/Http/Controllers/DemoController.php            |   25 +
++++ app/Http/Kernel.php                                |    0
++++ codex_changes_full.diff                            | 1475 ++++++++++++++++++++
++++ codex_changes_summary.txt                          |   26 +
++++ codex_nudge.txt                                    |    1 +
++++ ..._000001_create_personal_access_tokens_table.php |   23 +
++++ ...25_08_28_000002_create_role_user_table.php.bak} |    0
++++ .../2025_08_28_000050_spatie_baseline_pg.php       |   89 ++
++++ ...29_042459_create_permission_role_table.php.bak} |    0
++++ ...5_08_29_4245900-1_create_permissions_table.php} |    0
++++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |   89 ++
++++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |   83 ++
++++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |   82 ++
++++ ....php => permission_user_legacy.php.bak.bak.bak} |    0
++++ database/seeders/DevAdminSeeder.php                |   29 +
++++ frontend/.env.development                          |    1 +
++++ public/favicon.ico                                 |    1 +
++++ routes/api.php                                     |   13 +-
++++ routes/web.php                                     |    6 +
++++ scripts/codex_report.sh                            |    8 +
++++ scripts/deploy_local.sh                            |   47 +
++++ 24 files changed, 2065 insertions(+), 11 deletions(-)
 ++diff --git a/codex_nudge.txt b/codex_nudge.txt
 ++new file mode 100644
 ++index 0000000..74978ad
@@ -2540,7 +3318,7 @@ index 0000000..bd4dc77
 +++echo ">>> DONE (local deploy)"
 +diff --git a/codex_changes_summary.txt b/codex_changes_summary.txt
 +new file mode 100644
-+index 0000000..d8992b4
++index 0000000..d45f5c9
 +--- /dev/null
 ++++ b/codex_changes_summary.txt
 +@@ -0,0 +1,26 @@
@@ -2550,17 +3328,17 @@ index 0000000..bd4dc77
 ++ .gitignore                                         |    1 +
 ++ app/Http/Controllers/DemoController.php            |   25 +
 ++ app/Http/Kernel.php                                |    0
-++ codex_changes_full.diff                            | 1475 ++++++++++++++++++++
+++ codex_changes_full.diff                            | 2240 ++++++++++++++++++++
 ++ codex_changes_summary.txt                          |   26 +
 ++ codex_nudge.txt                                    |    1 +
 ++ ..._000001_create_personal_access_tokens_table.php |   23 +
 ++ ...25_08_28_000002_create_role_user_table.php.bak} |    0
-++ .../2025_08_28_000050_spatie_baseline_pg.php       |   89 ++
+++ .../2025_08_28_000050_spatie_baseline_pg.php       |   89 +
 ++ ...29_042459_create_permission_role_table.php.bak} |    0
 ++ ...5_08_29_4245900-1_create_permissions_table.php} |    0
-++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |   89 ++
-++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |   83 ++
-++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |   82 ++
+++ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |   89 +
+++ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |   83 +
+++ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |   82 +
 ++ ....php => permission_user_legacy.php.bak.bak.bak} |    0
 ++ database/seeders/DevAdminSeeder.php                |   29 +
 ++ frontend/.env.development                          |    1 +
@@ -2569,7 +3347,7 @@ index 0000000..bd4dc77
 ++ routes/web.php                                     |    6 +
 ++ scripts/codex_report.sh                            |    8 +
 ++ scripts/deploy_local.sh                            |   47 +
-++ 24 files changed, 2065 insertions(+), 11 deletions(-)
+++ 24 files changed, 2830 insertions(+), 11 deletions(-)
 +diff --git a/codex_nudge.txt b/codex_nudge.txt
 +new file mode 100644
 +index 0000000..74978ad
@@ -3155,7 +3933,7 @@ index 0000000..bd4dc77
 ++echo ">>> DONE (local deploy)"
 diff --git a/codex_changes_summary.txt b/codex_changes_summary.txt
 new file mode 100644
-index 0000000..d45f5c9
+index 0000000..024c419
 --- /dev/null
 +++ b/codex_changes_summary.txt
 @@ -0,0 +1,26 @@
@@ -3165,7 +3943,7 @@ index 0000000..d45f5c9
 + .gitignore                                         |    1 +
 + app/Http/Controllers/DemoController.php            |   25 +
 + app/Http/Kernel.php                                |    0
-+ codex_changes_full.diff                            | 2240 ++++++++++++++++++++
++ codex_changes_full.diff                            | 3005 ++++++++++++++++++++
 + codex_changes_summary.txt                          |   26 +
 + codex_nudge.txt                                    |    1 +
 + ..._000001_create_personal_access_tokens_table.php |   23 +
@@ -3184,7 +3962,7 @@ index 0000000..d45f5c9
 + routes/web.php                                     |    6 +
 + scripts/codex_report.sh                            |    8 +
 + scripts/deploy_local.sh                            |   47 +
-+ 24 files changed, 2830 insertions(+), 11 deletions(-)
++ 24 files changed, 3595 insertions(+), 11 deletions(-)
 diff --git a/codex_nudge.txt b/codex_nudge.txt
 new file mode 100644
 index 0000000..74978ad
@@ -3654,39 +4432,131 @@ index e69de29..e7b8dfb 100644
 +<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" aria-hidden="true" role="img" class="iconify iconify--logos" width="31.88" height="32" preserveAspectRatio="xMidYMid meet" viewBox="0 0 256 257"><defs><linearGradient id="IconifyId1813088fe1fbc01fb466" x1="-.828%" x2="57.636%" y1="7.652%" y2="78.411%"><stop offset="0%" stop-color="#41D1FF"></stop><stop offset="100%" stop-color="#BD34FE"></stop></linearGradient><linearGradient id="IconifyId1813088fe1fbc01fb467" x1="43.376%" x2="50.316%" y1="2.242%" y2="89.03%"><stop offset="0%" stop-color="#FFEA83"></stop><stop offset="8.333%" stop-color="#FFDD35"></stop><stop offset="100%" stop-color="#FFA800"></stop></linearGradient></defs><path fill="url(#IconifyId1813088fe1fbc01fb466)" d="M255.153 37.938L134.897 252.976c-2.483 4.44-8.862 4.466-11.382.048L.875 37.958c-2.746-4.814 1.371-10.646 6.827-9.67l120.385 21.517a6.537 6.537 0 0 0 2.322-.004l117.867-21.483c5.438-.991 9.574 4.796 6.877 9.62Z"></path><path fill="url(#IconifyId1813088fe1fbc01fb467)" d="M185.432.063L96.44 17.501a3.268 3.268 0 0 0-2.634 3.014l-5.474 92.456a3.268 3.268 0 0 0 3.997 3.378l24.777-5.718c2.318-.535 4.413 1.507 3.936 3.838l-7.361 36.047c-.495 2.426 1.782 4.5 4.151 3.78l15.304-4.649c2.372-.72 4.652 1.36 4.15 3.788l-11.698 56.621c-.732 3.542 3.979 5.473 5.943 2.437l1.313-2.028l72.516-144.72c1.215-2.423-.88-5.186-3.54-4.672l-25.505 4.922c-2.396.462-4.435-1.77-3.759-4.114l16.646-57.705c.677-2.35-1.37-4.583-3.769-4.113Z"></path></svg>
 \ No newline at end of file
 diff --git a/routes/api.php b/routes/api.php
-index c57be42..0d594e5 100644
+index c57be42..00a79fb 100644
 --- a/routes/api.php
 +++ b/routes/api.php
-@@ -1,7 +1,9 @@
+@@ -1,58 +1,74 @@
  <?php
--
--use Illuminate\Support\Facades\Route;
- use App\Http\Controllers\AuthTokenController;
+ 
+ use Illuminate\Support\Facades\Route;
+-use App\Http\Controllers\AuthTokenController;
+ 
+-Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
++// از کنترلر احراز هویت موجودِ پروژه استفاده می‌کنیم:
++use App\Http\Controllers\Api\AuthController;
+ 
+-// صدور توکن
+-Route::post('/auth/token', [AuthTokenController::class, 'issue']);
++// دمو کنترلر (Codex اضافه کرده):
 +use App\Http\Controllers\DemoController;
-+
-+
-+
  
- Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
+-// مسیر امن پایه
+-Route::middleware(['auth:sanctum'])->get('/secure/ping', function () {
+-    return response()->json(['success'=>true,'data'=>'pong']);
+-});
++/*
++|--------------------------------------------------------------------------
++| Public
++|--------------------------------------------------------------------------
++*/
++Route::get('ping', fn() => response()->json([
++    'success' => true,
++    'data'    => ['pong' => true],
++    'trace_id'=> null,
++]));
  
-@@ -23,10 +25,6 @@
+-// --- RBAC protected routes ---
+-Route::middleware(['auth:sanctum','role:Admin'])->get('/admin/ping', function () {
+-    return response()->json(['success'=>true,'data'=>'admin-pong']);
++// Auth (از کنترلر موجود شما که الان جواب می‌دهد)
++Route::prefix('auth')->group(function () {
++    Route::post('register', [AuthController::class, 'register']);
++    Route::post('login',    [AuthController::class, 'issueToken']); // قبلاً همین کار می‌کرد
++    Route::middleware('auth:sanctum')->group(function () {
++        Route::post('logout', [AuthController::class, 'logout']);
++        Route::get('me',      [AuthController::class, 'me']);
++    });
  });
  
- // ===== M03: Marketplace Base (protected) =====
+-Route::middleware(['auth:sanctum','permission:system.view'])->get('/perm/ping', function () {
+-    return response()->json(['success'=>true,'data'=>'perm-pong']);
+-});
++// Demo routes (عمومی و محافظت‌شده)
++Route::get('demo/hello', [DemoController::class, 'hello']);
++Route::middleware('auth:sanctum')->get('demo/secure', [DemoController::class, 'secure']);
++
++/*
++|--------------------------------------------------------------------------
++| Protected (placeholder)
++|--------------------------------------------------------------------------
++| بلاک‌های NFT و Marketplace عمداً غیرفعال شدند تا وقتی کنترلرها آماده شد.
++| اگر لازم شد، بعداً با شرط وجود کلاس‌ها می‌توانیم برگردانیم.
++*/
++
++/*
++// ===== NFT (فعلاً غیرفعال چون کنترلر وجود ندارد) =====
++// use App\Http\Controllers\Api\NFT\NFTController;
++// Route::middleware('auth:sanctum')->prefix('nft')->group(function () {
++//     Route::post('mint',     [NFTController::class, 'mint']);
++//     Route::post('transfer', [NFTController::class, 'transfer']);
++//     Route::post('burn',     [NFTController::class, 'burn']);
++// });
++
++// ===== Marketplace (فعلاً غیرفعال چون کنترلرها وجود ندارند) =====
++// use App\Http\Controllers\Api\Marketplace\CategoryController;
++// use App\Http\Controllers\Api\Marketplace\ProductController;
++// use App\Http\Controllers\Api\Marketplace\InventoryController;
++// use App\Http\Controllers\Api\Marketplace\OrderController;
++// if (class_exists(\App\Http\Controllers\Api\Marketplace\CategoryController::class)) {
++//     Route::middleware(['auth:sanctum'])->group(function () {
++//         // Categories
++//         Route::get('/market/categories', [CategoryController::class, 'index'])->middleware('permission:system.view');
++//         // ...
++//     });
++// }
++*/
+ 
+-// ===== M03: Marketplace Base (protected) =====
 -use App\Http\Controllers\Api\Marketplace\CategoryController;
 -use App\Http\Controllers\Api\Marketplace\ProductController;
 -use App\Http\Controllers\Api\Marketplace\InventoryController;
 -use App\Http\Controllers\Api\Marketplace\OrderController;
- 
- Route::middleware(['auth:sanctum'])->group(function () {
-     // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
-@@ -56,3 +54,6 @@
-     Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
-     Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
+-
+-Route::middleware(['auth:sanctum'])->group(function () {
+-    // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
+-    Route::get('/market/categories', [CategoryController::class, 'index'])->middleware('permission:system.view');
+-    Route::get('/market/categories/{id}', [CategoryController::class, 'show'])->middleware('permission:system.view');
+-    Route::post('/market/categories', [CategoryController::class, 'store'])->middleware('permission:inventory.manage');
+-    Route::put('/market/categories/{id}', [CategoryController::class, 'update'])->middleware('permission:inventory.manage');
+-    Route::delete('/market/categories/{id}', [CategoryController::class, 'destroy'])->middleware('permission:inventory.manage');
+-
+-    // Products
+-    Route::get('/market/products', [ProductController::class, 'index'])->middleware('permission:system.view');
+-    Route::get('/market/products/{id}', [ProductController::class, 'show'])->middleware('permission:system.view');
+-    Route::post('/market/products', [ProductController::class, 'store'])->middleware('permission:inventory.manage');
+-    Route::put('/market/products/{id}', [ProductController::class, 'update'])->middleware('permission:inventory.manage');
+-    Route::delete('/market/products/{id}', [ProductController::class, 'destroy'])->middleware('permission:inventory.manage');
+-
+-    // Inventory
+-    Route::get('/market/products/{productId}/inventory', [InventoryController::class, 'show'])->middleware('permission:inventory.read|inventory.manage');
+-    Route::post('/market/products/{productId}/inventory/add', [InventoryController::class, 'add'])->middleware('permission:inventory.manage');
+-    Route::post('/market/products/{productId}/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
+-    Route::get('/market/products/{productId}/inventory/movements', [InventoryController::class, 'movements'])->middleware('permission:inventory.read|inventory.manage');
+-
+-    // Orders
+-    Route::get('/market/orders', [OrderController::class, 'index'])->middleware('permission:orders.read');
+-    Route::get('/market/orders/{id}', [OrderController::class, 'show'])->middleware('permission:orders.read');
+-    Route::post('/market/orders', [OrderController::class, 'store'])->middleware('permission:orders.write');
+-    Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
+-    Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
++// Fallback JSON 404
++Route::fallback(function () {
++    return response()->json([
++        'success' => false,
++        'error'   => ['code' => 404, 'message' => 'API route not found'],
++        'trace_id'=> null,
++    ], 404);
  });
-+
-+Route::get("demo/hello", [DemoController::class, "hello"]);
-+Route::middleware("auth:sanctum")->get("demo/secure", [DemoController::class, "secure"]);
 diff --git a/routes/web.php b/routes/web.php
 index 8e1360a..520fa61 100644
 --- a/routes/web.php

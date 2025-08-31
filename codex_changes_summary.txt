@@ -2,9 +2,10 @@ Summary of changes vs main:
  .codex-target                                      |    1 +
  .github/workflows/deploy.yml                       |   76 +-
  .gitignore                                         |    1 +
+ app/Http/Controllers/Api/AuthController.php        |    2 +-
  app/Http/Controllers/DemoController.php            |   25 +
  app/Http/Kernel.php                                |    0
- codex_changes_full.diff                            | 3005 ++++++++++++++++++++
+ codex_changes_full.diff                            | 3770 ++++++++++++++++++++
  codex_changes_summary.txt                          |   26 +
  codex_nudge.txt                                    |    1 +
  ..._000001_create_personal_access_tokens_table.php |   23 +
@@ -19,8 +20,8 @@ Summary of changes vs main:
  database/seeders/DevAdminSeeder.php                |   29 +
  frontend/.env.development                          |    1 +
  public/favicon.ico                                 |    1 +
- routes/api.php                                     |   13 +-
+ routes/api.php                                     |  110 +-
  routes/web.php                                     |    6 +
  scripts/codex_report.sh                            |    8 +
  scripts/deploy_local.sh                            |   47 +
- 24 files changed, 3595 insertions(+), 11 deletions(-)
+ 25 files changed, 4417 insertions(+), 53 deletions(-)
