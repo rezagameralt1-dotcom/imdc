@@ -4,7 +4,7 @@ Summary of changes vs main:
  .gitignore                                         |    1 +
  app/Http/Controllers/DemoController.php            |   25 +
  app/Http/Kernel.php                                |    0
- codex_changes_full.diff                            | 2240 ++++++++++++++++++++
+ codex_changes_full.diff                            | 3005 ++++++++++++++++++++
  codex_changes_summary.txt                          |   26 +
  codex_nudge.txt                                    |    1 +
  ..._000001_create_personal_access_tokens_table.php |   23 +
@@ -23,4 +23,4 @@ Summary of changes vs main:
  routes/web.php                                     |    6 +
  scripts/codex_report.sh                            |    8 +
  scripts/deploy_local.sh                            |   47 +
- 24 files changed, 2830 insertions(+), 11 deletions(-)
+ 24 files changed, 3595 insertions(+), 11 deletions(-)
