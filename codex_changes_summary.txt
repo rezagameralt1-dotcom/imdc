@@ -1,23 +1,26 @@
 Summary of changes vs main:
- .codex-target                                      |  1 +
- .github/workflows/deploy.yml                       | 76 ++++++++++++++++--
- .gitignore                                         |  1 +
- app/Http/Controllers/DemoController.php            | 25 ++++++
- app/Http/Kernel.php                                |  0
- codex_nudge.txt                                    |  1 +
- ..._000001_create_personal_access_tokens_table.php | 23 ++++++
- ...25_08_28_000002_create_role_user_table.php.bak} |  0
- .../2025_08_28_000050_spatie_baseline_pg.php       | 89 ++++++++++++++++++++++
- ...29_042459_create_permission_role_table.php.bak} |  0
- ...5_08_29_4245900-1_create_permissions_table.php} |  0
- ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak | 89 ++++++++++++++++++++++
- ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak | 83 ++++++++++++++++++++
- ...5_08_30_080000_fix_spatie_guard_and_bridges.php | 82 ++++++++++++++++++++
- ....php => permission_user_legacy.php.bak.bak.bak} |  0
- database/seeders/DevAdminSeeder.php                | 29 +++++++
- frontend/.env.development                          |  1 +
- public/favicon.ico                                 |  1 +
- routes/api.php                                     | 13 ++--
- routes/web.php                                     |  6 ++
- scripts/deploy_local.sh                            | 47 ++++++++++++
- 21 files changed, 556 insertions(+), 11 deletions(-)
+ .codex-target                                      |   1 +
+ .github/workflows/deploy.yml                       |  76 ++-
+ .gitignore                                         |   1 +
+ app/Http/Controllers/DemoController.php            |  25 +
+ app/Http/Kernel.php                                |   0
+ codex_changes_full.diff                            | 713 +++++++++++++++++++++
+ codex_changes_summary.txt                          |  23 +
+ codex_nudge.txt                                    |   1 +
+ ..._000001_create_personal_access_tokens_table.php |  23 +
+ ...25_08_28_000002_create_role_user_table.php.bak} |   0
+ .../2025_08_28_000050_spatie_baseline_pg.php       |  89 +++
+ ...29_042459_create_permission_role_table.php.bak} |   0
+ ...5_08_29_4245900-1_create_permissions_table.php} |   0
+ ...5_08_30_070000_fix_spatie_tables_sqlite.php.bak |  89 +++
+ ...5_08_30_070100_fix_spatie_tables_sqlite.php.bak |  83 +++
+ ...5_08_30_080000_fix_spatie_guard_and_bridges.php |  82 +++
+ ....php => permission_user_legacy.php.bak.bak.bak} |   0
+ database/seeders/DevAdminSeeder.php                |  29 +
+ frontend/.env.development                          |   1 +
+ public/favicon.ico                                 |   1 +
+ routes/api.php                                     |  13 +-
+ routes/web.php                                     |   6 +
+ scripts/codex_report.sh                            |   8 +
+ scripts/deploy_local.sh                            |  47 ++
+ 24 files changed, 1300 insertions(+), 11 deletions(-)
