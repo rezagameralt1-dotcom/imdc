@@ -5,7 +5,7 @@ Summary of changes vs main:
  app/Http/Controllers/Api/AuthController.php        |    2 +-
  app/Http/Controllers/DemoController.php            |   25 +
  app/Http/Kernel.php                                |    0
- codex_changes_full.diff                            | 5511 ++++++++++++++++++++
+ codex_changes_full.diff                            | 6382 ++++++++++++++++++++
  codex_changes_summary.txt                          |   27 +
  codex_nudge.txt                                    |    1 +
  ..._000001_create_personal_access_tokens_table.php |   23 +
@@ -24,4 +24,4 @@ Summary of changes vs main:
  routes/web.php                                     |    6 +
  scripts/codex_report.sh                            |    8 +
  scripts/deploy_local.sh                            |   47 +
- 25 files changed, 6159 insertions(+), 53 deletions(-)
+ 25 files changed, 7030 insertions(+), 53 deletions(-)
