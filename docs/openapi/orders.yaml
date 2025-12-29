@@ -1,0 +1,135 @@
+openapi: 3.1.0
+info:
+  title: Orders API
+  version: 1.0.0
+paths:
+  /api/v1/orders:
+    get:
+      summary: List orders
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Orders retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+    post:
+      summary: Create order
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrderInput'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+  /api/v1/orders/{id}:
+    get:
+      summary: Get order
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+  /api/v1/orders/{id}/pay:
+    post:
+      summary: Mark order paid
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+  /api/v1/orders/{id}/cancel:
+    post:
+      summary: Cancel order
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandardResponse'
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    StandardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          nullable: true
+        error:
+          nullable: true
+        trace_id:
+          type: string
+          format: uuid
+    OrderItemInput:
+      type: object
+      properties:
+        product_id:
+          type: string
+          format: uuid
+        quantity:
+          type: integer
+          minimum: 1
+      required: [product_id, quantity]
+    CreateOrderInput:
+      type: object
+      properties:
+        currency:
+          type: string
+        meta:
+          type: object
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderItemInput'
+      required: [items]
+
