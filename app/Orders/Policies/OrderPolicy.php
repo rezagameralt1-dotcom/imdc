@@ -14,7 +14,7 @@ class OrderPolicy
 
     public function view(User $user, Order $order): bool
     {
-        return $this->viewAny($user) || $order->user_id === $user->id;
+        return $this->viewAny($user);
     }
 
     public function create(User $user): bool
@@ -27,4 +27,5 @@ class OrderPolicy
         return $this->view($user, $order);
     }
 }
+
 

@@ -1,38 +1,67 @@
-version: '3.9'
-
 services:
+  core-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: imdc_core
+      POSTGRES_USER: ${IMDC_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${IMDC_DB_PASSWORD}
+    ports:
+      - "5436:5432"
+    volumes:
+      - core-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMDC_DB_USER:-postgres} -d imdc_core"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   orders-db:
     image: postgres:15
     environment:
       POSTGRES_DB: imdc_orders
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: ${IMDC_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${IMDC_DB_PASSWORD}
     ports:
       - "5435:5432"
     volumes:
       - orders-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMDC_DB_USER:-postgres} -d imdc_orders"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   products-db:
     image: postgres:15
     environment:
       POSTGRES_DB: imdc_products
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: ${IMDC_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${IMDC_DB_PASSWORD}
     ports:
       - "5433:5432"
     volumes:
       - products-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMDC_DB_USER:-postgres} -d imdc_products"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   inventory-db:
     image: postgres:15
     environment:
       POSTGRES_DB: imdc_inventory
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: secret
+      POSTGRES_USER: ${IMDC_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${IMDC_DB_PASSWORD}
     ports:
       - "5434:5432"
     volumes:
       - inventory-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMDC_DB_USER:-postgres} -d imdc_inventory"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
   redis:
     image: redis:7
@@ -41,10 +70,16 @@ services:
       - "6381:6379"
     volumes:
       - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
 
 volumes:
-  orders-data:
-  products-data:
-  inventory-data:
-  redis-data:
+  core-data: {}
+  orders-data: {}
+  products-data: {}
+  inventory-data: {}
+  redis-data: {}
 

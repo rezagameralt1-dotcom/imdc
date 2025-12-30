@@ -15,27 +15,19 @@ abstract class BaseApiRequest extends FormRequest
 
     protected function failedValidation(Validator $validator): void
     {
-        throw new HttpResponseException(response()->json([
-            'success' => false,
-            'data' => null,
-            'error' => [
-                'message' => 'Validation failed',
-                'details' => $validator->errors(),
-            ],
-            'trace_id' => $this->request->attributes->get('trace_id'),
-        ], 422));
-    }
+        $traceId = $this->attributes->get('trace_id')
+            ?? $this->header('X-Trace-Id');
 
-    protected function failedAuthorization(): void
-    {
-        throw new HttpResponseException(response()->json([
-            'success' => false,
-            'data' => null,
-            'error' => [
-                'message' => 'Forbidden',
-            ],
-            'trace_id' => $this->request->attributes->get('trace_id'),
-        ], 403));
+        throw new HttpResponseException(
+            response()->json([
+                'success' => false,
+                'data' => null,
+                'error' => [
+                    'message' => 'Validation failed',
+                    'fields' => $validator->errors()->toArray(),
+                ],
+                'trace_id' => $traceId,
+            ], 422)
+        );
     }
 }
-

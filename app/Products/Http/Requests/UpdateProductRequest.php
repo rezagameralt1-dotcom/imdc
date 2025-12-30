@@ -20,3 +20,5 @@ class UpdateProductRequest extends BaseApiRequest
     }
 }
 
+
+

@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "[1/2] Drop+Create databases..."
+
+docker exec -it backend-core-db-1 bash -lc "psql -U postgres -d postgres -c \"DROP DATABASE IF EXISTS imdc_core WITH (FORCE);\""
+docker exec -it backend-core-db-1 bash -lc "psql -U postgres -d postgres -c \"CREATE DATABASE imdc_core;\""
+
+docker exec -it backend-products-db-1 bash -lc "psql -U postgres -d postgres -c \"DROP DATABASE IF EXISTS imdc_products WITH (FORCE);\""
+docker exec -it backend-products-db-1 bash -lc "psql -U postgres -d postgres -c \"CREATE DATABASE imdc_products;\""
+
+docker exec -it backend-orders-db-1 bash -lc "psql -U postgres -d postgres -c \"DROP DATABASE IF EXISTS imdc_orders WITH (FORCE);\""
+docker exec -it backend-orders-db-1 bash -lc "psql -U postgres -d postgres -c \"CREATE DATABASE imdc_orders;\""
+
+docker exec -it backend-inventory-db-1 bash -lc "psql -U postgres -d postgres -c \"DROP DATABASE IF EXISTS imdc_inventory WITH (FORCE);\""
+docker exec -it backend-inventory-db-1 bash -lc "psql -U postgres -d postgres -c \"CREATE DATABASE imdc_inventory;\""
+
+echo "[2/2] Done."

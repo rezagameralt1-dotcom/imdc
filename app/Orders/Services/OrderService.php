@@ -3,8 +3,6 @@
 namespace App\Orders\Services;
 
 use App\Inventory\Services\InventoryService;
-use App\Models\User;
-use App\Orders\Jobs\ProcessOrderCreatedJob;
 use App\Orders\Models\Order;
 use App\Orders\Models\OrderItem;
 use App\Products\Models\Product;
@@ -22,7 +20,7 @@ class OrderService
     ) {
     }
 
-    public function create(array $payload, ?User $user = null, ?string $traceId = null): Order
+    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): Order
     {
         $itemsInput = $payload['items'] ?? [];
         if (empty($itemsInput)) {
@@ -36,15 +34,13 @@ class OrderService
 
         $meta = $payload['meta'] ?? [];
 
-        $order = DB::connection('orders')->transaction(function () use ($user, $itemsInput, $products, &$orderTotal, $currency, $traceId, $meta) {
+        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId) {
             /** @var Order $order */
             $order = Order::create([
-                'user_id' => $user?->id,
+                'shop_customer_id' => $shopCustomerId,
                 'status' => Order::STATUS_PENDING,
-                'inventory_status' => Order::INVENTORY_PENDING,
                 'total_amount' => 0,
                 'currency' => $currency,
-                'meta' => $meta,
                 'trace_id' => $traceId,
             ]);
 
@@ -52,25 +48,24 @@ class OrderService
                 $product = $products->get($item['product_id']);
 
                 if (!$product) {
-                    throw ValidationException::withMessages(['product_id' => 'Product not found: '.$item['product_id']]);
+                    throw ValidationException::withMessages(['items' => ['Product not found: '.$item['product_id']]]);
                 }
 
                 if ($product->status !== 'active') {
-                    throw ValidationException::withMessages(['product_id' => 'Product not available: '.$product->id]);
+                    throw ValidationException::withMessages(['items' => ['Product not available: '.$product->id]]);
                 }
 
                 $quantity = (int) $item['quantity'];
                 $unitPrice = (float) $product->price;
-                $subtotal = $unitPrice * $quantity;
-                $orderTotal += $subtotal;
+                $lineTotal = $unitPrice * $quantity;
+                $orderTotal += $lineTotal;
 
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $product->id,
-                    'product_name' => $product->name,
                     'unit_price' => $unitPrice,
                     'quantity' => $quantity,
-                    'subtotal' => $subtotal,
+                    'line_total' => $lineTotal,
                 ]);
             }
 
@@ -82,9 +77,32 @@ class OrderService
 
         $order->load('items');
 
+        try {
+            $reserved = $this->inventoryService->reserveForOrder(
+                $order->id,
+                $shopCustomerId,
+                $order->items->map(fn ($item) => [
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                ])->toArray(),
+                $order->trace_id
+            );
+        } catch (\Throwable $e) {
+            $order->delete();
+            throw $e;
+        }
+
+        if (! $reserved) {
+            $order->delete();
+            throw ValidationException::withMessages(['items' => ['Inventory reservation failed']]);
+        }
+
+        $order->status = Order::STATUS_RESERVED;
+        $order->save();
+
         $this->publisher->publish('order.created', [
             'order_id' => $order->id,
-            'user_id' => $user?->id,
+            'shop_customer_id' => $shopCustomerId,
             'items' => $order->items->map(fn ($item) => [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
@@ -92,24 +110,41 @@ class OrderService
             'trace_id' => $traceId,
         ]);
 
-        $this->auditLogger->log('order.created', $order, $user, ['total' => $orderTotal], $traceId);
-
-        // Kick off asynchronous inventory reservation
-        dispatch(new ProcessOrderCreatedJob($order->id));
+        $this->auditLogger->log('order.created', $order, null, ['total' => $orderTotal, 'shop_customer_id' => $shopCustomerId], $traceId);
 
         return $order;
     }
 
-    public function markPaid(Order $order, ?User $user = null, ?string $traceId = null): Order
+    public function markPaid(Order $order, ?string $traceId = null): Order
     {
         if ($order->status === Order::STATUS_PAID) {
-            return $order;
+            // Idempotency + reconciliation:
+            // Order may already be PAID (e.g. retried /pay), but inventory might still have a RESERVED reservation.
+            $items = $order->items->map(fn ($it) => [
+                'product_id' => (string) $it->product_id,
+                'quantity' => (int) $it->quantity,
+            ])->toArray();
+
+            $this->inventoryService->finalizeForOrder($order->id, $items, $traceId);
+
+            return $order->refresh();
         }
 
-        if ($order->inventory_status !== Order::INVENTORY_RESERVED) {
-            throw ValidationException::withMessages([
-                'order' => 'Inventory not reserved for this order.',
-            ]);
+        if (! in_array($order->status, [Order::STATUS_PENDING, Order::STATUS_RESERVED], true)) {
+            throw ValidationException::withMessages(['order' => 'Order not payable in current status']);
+        }
+
+        $finalized = $this->inventoryService->finalizeForOrder(
+            $order->id,
+            $order->items->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+            ])->toArray(),
+            $traceId ?? $order->trace_id
+        );
+
+        if (! $finalized) {
+            throw ValidationException::withMessages(['order' => 'Inventory finalize failed']);
         }
 
         $order->status = Order::STATUS_PAID;
@@ -117,33 +152,48 @@ class OrderService
 
         $this->publisher->publish('order.paid', [
             'order_id' => $order->id,
-            'user_id' => $user?->id,
+            'shop_customer_id' => $order->shop_customer_id,
             'trace_id' => $traceId ?? $order->trace_id,
         ]);
 
-        $this->auditLogger->log('order.paid', $order, $user, [], $traceId ?? $order->trace_id);
+        $this->auditLogger->log('order.paid', $order, null, [], $traceId ?? $order->trace_id);
 
         return $order;
     }
 
-    public function cancel(Order $order, ?User $user = null): Order
+    public function cancel(Order $order): Order
     {
-        if ($order->status === Order::STATUS_CANCELLED) {
+        if ($order->status === Order::STATUS_CANCELED) {
             return $order;
         }
 
-        $order->status = Order::STATUS_CANCELLED;
-        $order->save();
+        if (! in_array($order->status, [Order::STATUS_PENDING, Order::STATUS_RESERVED], true)) {
+            throw ValidationException::withMessages(['order' => 'Order not cancelable in current status']);
+        }
 
-        $this->inventoryService->releaseForOrder($order, $user);
+        DB::connection('orders')->transaction(function () use ($order) {
+            $items = $order->items->map(fn ($item) => [
+                'product_id' => $item->product_id,
+                'quantity' => $item->quantity,
+            ])->toArray();
+
+            $this->inventoryService->releaseForOrder(
+                $order->id,
+                $items,
+                $order->trace_id
+            );
+
+            $order->status = Order::STATUS_CANCELED;
+            $order->save();
+        });
 
         $this->publisher->publish('order.cancelled', [
             'order_id' => $order->id,
-            'user_id' => $user?->id,
+            'shop_customer_id' => $order->shop_customer_id,
             'trace_id' => $order->trace_id,
         ]);
 
-        $this->auditLogger->log('order.cancelled', $order, $user, [], $order->trace_id);
+        $this->auditLogger->log('order.cancelled', $order, null, [], $order->trace_id);
 
         return $order;
     }

@@ -4,8 +4,6 @@ namespace App\Inventory\Services;
 
 use App\Inventory\Models\InventoryItem;
 use App\Inventory\Models\InventoryReservation;
-use App\Models\User;
-use App\Orders\Models\Order;
 use App\Support\AuditLogger;
 use App\Support\Events\RedisStreamPublisher;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +17,7 @@ class InventoryService
     ) {
     }
 
-    public function adjustStock(string $productId, int $delta, ?User $actor = null, ?string $traceId = null): InventoryItem
+    public function adjustStock(string $productId, int $delta, ?string $traceId = null): InventoryItem
     {
         /** @var InventoryItem $item */
         $item = DB::connection('inventory')->transaction(function () use ($productId, $delta) {
@@ -39,7 +37,7 @@ class InventoryService
             $newAvailable = $inventoryItem->available_quantity + $delta;
             if ($newAvailable < 0) {
                 throw ValidationException::withMessages([
-                    'quantity' => 'Adjustment would result in negative stock.',
+                    'delta' => 'Adjustment would result in negative stock.',
                 ]);
             }
 
@@ -49,118 +47,227 @@ class InventoryService
             return $inventoryItem;
         });
 
-        $this->auditLogger->log('inventory.adjusted', $item, $actor, [
+        $this->auditLogger->log('inventory.adjusted', $item, null, [
             'delta' => $delta,
             'available_quantity' => $item->available_quantity,
         ], $traceId);
 
+        DB::connection('inventory')->table('inventory_movements')->insert([
+            'product_id' => $productId,
+            'delta_available' => $delta,
+            'delta_reserved' => 0,
+            'reason' => 'adjust',
+            'trace_id' => $traceId,
+            'created_at' => now(),
+        ]);
+
         return $item;
     }
 
-    public function reserveForOrder(Order $order, ?User $actor = null): bool
+    /**
+     * @param array<int, array{product_id:string,quantity:int}> $items
+     */
+    public function reserveForOrder(string $orderId, string $shopCustomerId, array $items, ?string $traceId = null): bool
     {
-        $failures = [];
+        return DB::connection('inventory')->transaction(function () use ($orderId, $items, $traceId, $shopCustomerId) {
+            $failures = [];
+            $lockedItems = [];
 
-        foreach ($order->items as $item) {
-            DB::connection('inventory')->transaction(function () use ($order, $item, &$failures) {
-                $inventoryItem = InventoryItem::query()
-                    ->where('product_id', $item->product_id)
+            foreach ($items as $item) {
+                $inv = InventoryItem::query()
+                    ->where('product_id', $item['product_id'])
                     ->lockForUpdate()
                     ->first();
 
-                if (!$inventoryItem || $inventoryItem->available_quantity < $item->quantity) {
-                    InventoryReservation::create([
-                        'product_id' => $item->product_id,
-                        'order_id' => $order->id,
-                        'quantity' => $item->quantity,
-                        'status' => 'failed',
-                        'reason' => 'Insufficient stock',
+                if (! $inv) {
+                    $inv = new InventoryItem([
+                        'product_id' => $item['product_id'],
+                        'available_quantity' => 0,
+                        'reserved_quantity' => 0,
                     ]);
+                    $inv->save();
+                }
 
+                $lockedItems[] = [$inv, $item];
+
+                if ($inv->available_quantity < $item['quantity']) {
                     $failures[] = [
-                        'product_id' => $item->product_id,
+                        'product_id' => $item['product_id'],
                         'reason' => 'Insufficient stock',
                     ];
+                }
+            }
 
-                    return;
+            if (! empty($failures)) {
+                foreach ($failures as $failure) {
+                    InventoryReservation::create([
+                        'product_id' => $failure['product_id'],
+                        'order_id' => $orderId,
+                        'quantity' => collect($items)->firstWhere('product_id', $failure['product_id'])['quantity'] ?? 0,
+                        'status' => 'failed',
+                        'reason' => $failure['reason'],
+                    ]);
                 }
 
-                $inventoryItem->available_quantity -= $item->quantity;
-                $inventoryItem->reserved_quantity += $item->quantity;
-                $inventoryItem->save();
+                $this->publisher->publish('inventory.failed', [
+                    'order_id' => $orderId,
+                    'failures' => $failures,
+                    'trace_id' => $traceId,
+                    'shop_customer_id' => $shopCustomerId,
+                ]);
+
+                $this->auditLogger->log('inventory.failed', $orderId, null, ['failures' => $failures], $traceId);
+
+                return false;
+            }
+
+            foreach ($lockedItems as [$inv, $item]) {
+                $inv->available_quantity -= $item['quantity'];
+                $inv->reserved_quantity += $item['quantity'];
+                $inv->save();
 
                 InventoryReservation::create([
-                    'product_id' => $item->product_id,
-                    'order_id' => $order->id,
-                    'quantity' => $item->quantity,
+                    'product_id' => $item['product_id'],
+                    'order_id' => $orderId,
+                    'quantity' => $item['quantity'],
                     'status' => 'reserved',
                 ]);
-            });
-        }
 
-        $order->inventory_status = empty($failures) ? Order::INVENTORY_RESERVED : Order::INVENTORY_FAILED;
-        $order->save();
+                DB::connection('inventory')->table('inventory_movements')->insert([
+                    'product_id' => $item['product_id'],
+                    'delta_available' => -$item['quantity'],
+                    'delta_reserved' => $item['quantity'],
+                    'reason' => 'reserve',
+                    'trace_id' => $traceId,
+                    'created_at' => now(),
+                ]);
+            }
 
-        if (empty($failures)) {
             $this->publisher->publish('inventory.reserved', [
-                'order_id' => $order->id,
-                'items' => $order->items->map(fn ($item) => [
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                ])->toArray(),
-                'trace_id' => $order->trace_id,
+                'order_id' => $orderId,
+                'items' => $items,
+                'trace_id' => $traceId,
+                'shop_customer_id' => $shopCustomerId,
             ]);
-        } else {
-            $this->publisher->publish('inventory.failed', [
-                'order_id' => $order->id,
-                'failures' => $failures,
-                'trace_id' => $order->trace_id,
-            ]);
-        }
 
-        $this->auditLogger->log(
-            empty($failures) ? 'inventory.reserved' : 'inventory.failed',
-            $order,
-            $actor,
-            ['failures' => $failures],
-            $order->trace_id
-        );
+            $this->auditLogger->log(
+                'inventory.reserved',
+                $orderId,
+                null,
+                ['items' => $items, 'shop_customer_id' => $shopCustomerId],
+                $traceId
+            );
 
-        return empty($failures);
+            return true;
+        });
     }
 
-    public function releaseForOrder(Order $order, ?User $actor = null): void
+    /**
+     * @param array<int, array{product_id:string,quantity:int}> $items
+     */
+    public function finalizeForOrder(string $orderId, array $items, ?string $traceId = null): bool
     {
-        $reservations = InventoryReservation::query()
-            ->where('order_id', $order->id)
-            ->where('status', 'reserved')
-            ->get();
-
-        foreach ($reservations as $reservation) {
-            DB::connection('inventory')->transaction(function () use ($reservation) {
-                $inventoryItem = InventoryItem::query()
-                    ->where('product_id', $reservation->product_id)
+        return DB::connection('inventory')->transaction(function () use ($orderId, $items, $traceId) {
+            foreach ($items as $item) {
+                $reservation = InventoryReservation::query()
+                    ->where('order_id', $orderId)
+                    ->where('product_id', $item['product_id'])
+                    ->whereIn('status', ['reserved', 'finalized'])
                     ->lockForUpdate()
                     ->first();
 
-                if ($inventoryItem) {
-                    $inventoryItem->reserved_quantity = max(
-                        0,
-                        $inventoryItem->reserved_quantity - $reservation->quantity
-                    );
-                    $inventoryItem->available_quantity += $reservation->quantity;
-                    $inventoryItem->save();
+                $inv = InventoryItem::query()
+                    ->where('product_id', $item['product_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                if (! $inv) {
+                    return false;
                 }
 
-                $reservation->status = 'released';
-                $reservation->save();
-            });
-        }
+                $consume = min($item['quantity'], max(0, $inv->reserved_quantity));
+                if ($consume > 0) {
+                    $inv->reserved_quantity = max(0, $inv->reserved_quantity - $consume);
+                    $inv->save();
 
-        $order->inventory_status = Order::INVENTORY_FAILED;
-        $order->save();
+                    DB::connection('inventory')->table('inventory_movements')->insert([
+                        'product_id' => $item['product_id'],
+                        'delta_available' => 0,
+                        'delta_reserved' => -$consume,
+                        'reason' => 'finalize',
+                        'trace_id' => $traceId,
+                        'created_at' => now(),
+                    ]);
+                }
 
-        $this->auditLogger->log('inventory.released', $order, $actor, [], $order->trace_id);
+                if ($reservation && $reservation->status !== 'finalized') {
+                    $reservation->status = 'finalized';
+                    $reservation->save();
+                }
+            }
+
+            $this->auditLogger->log(
+                'inventory.finalized',
+                $orderId,
+                null,
+                ['items' => $items],
+                $traceId
+            );
+
+            return true;
+        });
+    }
+
+    /**
+     * @param array<int, array{product_id:string,quantity:int}> $items
+     */
+    public function releaseForOrder(string $orderId, array $items, ?string $traceId = null): void
+    {
+        DB::connection('inventory')->transaction(function () use ($orderId, $items, $traceId) {
+            foreach ($items as $item) {
+                $inventoryItem = InventoryItem::query()
+                    ->where('product_id', $item['product_id'])
+                    ->lockForUpdate()
+                    ->first();
+
+                $qty = $item['quantity'];
+
+                $reservation = InventoryReservation::query()
+                    ->where('order_id', $orderId)
+                    ->where('product_id', $item['product_id'])
+                    ->where('status', 'reserved')
+                    ->lockForUpdate()
+                    ->first();
+
+                if ($reservation) {
+                    $reservation->status = 'released';
+                    $reservation->save();
+                }
+
+                if ($inventoryItem) {
+                    $adjust = min($qty, max(0, $inventoryItem->reserved_quantity));
+                    if ($adjust <= 0) {
+                        continue;
+                    }
+
+                    $inventoryItem->reserved_quantity = max(0, $inventoryItem->reserved_quantity - $adjust);
+                    $inventoryItem->available_quantity += $adjust;
+                    $inventoryItem->save();
+
+                    DB::connection('inventory')->table('inventory_movements')->insert([
+                        'product_id' => $item['product_id'],
+                        'delta_available' => $adjust,
+                        'delta_reserved' => -$adjust,
+                        'reason' => 'release',
+                        'trace_id' => $traceId,
+                        'created_at' => now(),
+                    ]);
+                }
+            }
+        });
+
+        $this->auditLogger->log('inventory.released', $orderId, null, ['items' => $items], $traceId);
     }
 }
+
 
