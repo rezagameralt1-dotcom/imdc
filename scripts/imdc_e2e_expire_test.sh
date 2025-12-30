@@ -1,9 +1,23 @@
 #!/bin/bash
 set -euo pipefail
 
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$DIR/smoke/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+rand_email(){ echo "imdc-smoke-$(date +%s)-$RANDOM@example.com"; }
+
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 PRODUCT_ID="${PRODUCT_ID:-019b6cbe-ceb7-7171-a8ee-7567683f73fd}"
 TTL_MINUTES="${TTL_MINUTES:-1}"
+if [[ -z "${EMAIL:-}" ]]; then EMAIL="$(rand_email)"; fi
+if [[ -z "${PASSWORD:-}" ]]; then PASSWORD="Passw0rd!123"; fi
 TRACE(){ echo "[IMDC-E2E] $*"; }
 FAIL(){ echo "[IMDC-E2E][ERROR] $*" >&2; exit 1; }
 
@@ -16,11 +30,6 @@ json_get(){
     if(is_bool($v)) echo $v?"true":"false"; elseif($v===null) echo ""; else echo $v;
   ' "$key"
 }
-
-rand_email(){ echo "imdc-smoke-$(date +%s)-$RANDOM@example.com"; }
-
-EMAIL=$(rand_email)
-PASSWORD="Password123!"
 
 TRACE "Register user $EMAIL"
 REG_PAYLOAD="{\"name\":\"Smoke User\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\"}"

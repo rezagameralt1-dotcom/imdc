@@ -11,11 +11,18 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+rand_email() { printf "imdc-smoke-%s-%s@example.com" "$(date +%s)" "$RANDOM"; }
+
 : "${BASE_URL:=http://127.0.0.1:8000}"
+if [[ -z "${EMAIL:-}" && -z "${IMDC_ADMIN_EMAIL:-}" ]]; then
+  EMAIL="$(rand_email)"
+fi
+
+if [[ -z "${PASSWORD:-}" && -z "${IMDC_ADMIN_PASSWORD:-}" ]]; then
+  PASSWORD="Passw0rd!123"
+fi
+
 : "${IMDC_ADMIN_EMAIL:=${EMAIL:-}}"
 : "${IMDC_ADMIN_PASSWORD:=${PASSWORD:-}}"
-
-[[ -n "${IMDC_ADMIN_EMAIL:-}" ]] || { echo "ERROR: EMAIL is required"; exit 1; }
-[[ -n "${IMDC_ADMIN_PASSWORD:-}" ]] || { echo "ERROR: PASSWORD is required"; exit 1; }
 
 export BASE_URL IMDC_ADMIN_EMAIL IMDC_ADMIN_PASSWORD
