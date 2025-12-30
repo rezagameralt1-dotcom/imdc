@@ -12,11 +12,20 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
-    // چون در جداول roles/permissions ستون guard_name را "web" گذاشتی:
     protected $guard_name = 'web';
 
-    protected $fillable = ['name','email','password'];
-    protected $hidden   = ['password','remember_token'];
+    /** @var list<string> */
+    protected $fillable = [
+        'name',
+        'email',
+        'password',
+    ];
+
+    /** @var list<string> */
+    protected $hidden = [
+        'password',
+        'remember_token',
+    ];
 
     protected function casts(): array
     {
@@ -26,7 +35,6 @@ class User extends Authenticatable
         ];
     }
 
-    // سازگاری با کد قدیمی (اگه میدلور از hasPermission استفاده می‌کنه)
     public function hasPermission(string $perm): bool
     {
         return $this->hasPermissionTo($perm);

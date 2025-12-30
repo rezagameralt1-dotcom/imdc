@@ -1,0 +1,50 @@
+version: '3.9'
+
+services:
+  orders-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: imdc_orders
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5435:5432"
+    volumes:
+      - orders-data:/var/lib/postgresql/data
+
+  products-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: imdc_products
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5433:5432"
+    volumes:
+      - products-data:/var/lib/postgresql/data
+
+  inventory-db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: imdc_inventory
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5434:5432"
+    volumes:
+      - inventory-data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6381:6379"
+    volumes:
+      - redis-data:/data
+
+volumes:
+  orders-data:
+  products-data:
+  inventory-data:
+  redis-data:
+

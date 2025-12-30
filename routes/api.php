@@ -1,58 +1,33 @@
 <?php
 
+use App\Http\Controllers\AuthController;
+use App\Inventory\Http\Controllers\InventoryController;
+use App\Orders\Http\Controllers\OrderController;
+use App\Products\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthTokenController;
 
-Route::get('/ping', fn() => response()->json(['success'=>true,'data'=>'pong']));
+Route::prefix('v1')->group(function () {
+    Route::post('auth/register', [AuthController::class, 'register']);
+    Route::post('auth/login', [AuthController::class, 'login']);
 
-// صدور توکن
-Route::post('/auth/token', [AuthTokenController::class, 'issue']);
+    Route::middleware(['auth:sanctum'])->group(function () {
+        Route::get('auth/me', [AuthController::class, 'me']);
+        Route::post('auth/logout', [AuthController::class, 'logout']);
 
-// مسیر امن پایه
-Route::middleware(['auth:sanctum'])->get('/secure/ping', function () {
-    return response()->json(['success'=>true,'data'=>'pong']);
+        Route::get('products', [ProductController::class, 'index']);
+        Route::post('products', [ProductController::class, 'store']);
+        Route::get('products/{id}', [ProductController::class, 'show']);
+        Route::match(['put', 'patch'], 'products/{id}', [ProductController::class, 'update']);
+
+        Route::get('orders', [OrderController::class, 'index']);
+        Route::post('orders', [OrderController::class, 'store']);
+        Route::get('orders/{id}', [OrderController::class, 'show']);
+        Route::post('orders/{id}/pay', [OrderController::class, 'pay']);
+        Route::post('orders/{id}/cancel', [OrderController::class, 'cancel']);
+
+        Route::get('inventory/{productId}', [InventoryController::class, 'show']);
+        Route::post('inventory/{productId}/adjust', [InventoryController::class, 'adjust']);
+        Route::post('inventory/reserve', [InventoryController::class, 'reserve']);
+    });
 });
 
-// --- RBAC protected routes ---
-Route::middleware(['auth:sanctum','role:Admin'])->get('/admin/ping', function () {
-    return response()->json(['success'=>true,'data'=>'admin-pong']);
-});
-
-Route::middleware(['auth:sanctum','permission:system.view'])->get('/perm/ping', function () {
-    return response()->json(['success'=>true,'data'=>'perm-pong']);
-});
-
-// ===== M03: Marketplace Base (protected) =====
-use App\Http\Controllers\Api\Marketplace\CategoryController;
-use App\Http\Controllers\Api\Marketplace\ProductController;
-use App\Http\Controllers\Api\Marketplace\InventoryController;
-use App\Http\Controllers\Api\Marketplace\OrderController;
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    // Categories (نیاز به system.view برای مشاهده، inventory.manage برای مدیریت)
-    Route::get('/market/categories', [CategoryController::class, 'index'])->middleware('permission:system.view');
-    Route::get('/market/categories/{id}', [CategoryController::class, 'show'])->middleware('permission:system.view');
-    Route::post('/market/categories', [CategoryController::class, 'store'])->middleware('permission:inventory.manage');
-    Route::put('/market/categories/{id}', [CategoryController::class, 'update'])->middleware('permission:inventory.manage');
-    Route::delete('/market/categories/{id}', [CategoryController::class, 'destroy'])->middleware('permission:inventory.manage');
-
-    // Products
-    Route::get('/market/products', [ProductController::class, 'index'])->middleware('permission:system.view');
-    Route::get('/market/products/{id}', [ProductController::class, 'show'])->middleware('permission:system.view');
-    Route::post('/market/products', [ProductController::class, 'store'])->middleware('permission:inventory.manage');
-    Route::put('/market/products/{id}', [ProductController::class, 'update'])->middleware('permission:inventory.manage');
-    Route::delete('/market/products/{id}', [ProductController::class, 'destroy'])->middleware('permission:inventory.manage');
-
-    // Inventory
-    Route::get('/market/products/{productId}/inventory', [InventoryController::class, 'show'])->middleware('permission:inventory.read|inventory.manage');
-    Route::post('/market/products/{productId}/inventory/add', [InventoryController::class, 'add'])->middleware('permission:inventory.manage');
-    Route::post('/market/products/{productId}/inventory/adjust', [InventoryController::class, 'adjust'])->middleware('permission:inventory.manage');
-    Route::get('/market/products/{productId}/inventory/movements', [InventoryController::class, 'movements'])->middleware('permission:inventory.read|inventory.manage');
-
-    // Orders
-    Route::get('/market/orders', [OrderController::class, 'index'])->middleware('permission:orders.read');
-    Route::get('/market/orders/{id}', [OrderController::class, 'show'])->middleware('permission:orders.read');
-    Route::post('/market/orders', [OrderController::class, 'store'])->middleware('permission:orders.write');
-    Route::post('/market/orders/{id}/pay', [OrderController::class, 'pay'])->middleware('permission:orders.write');
-    Route::post('/market/orders/{id}/cancel', [OrderController::class, 'cancel'])->middleware('permission:orders.write');
-});

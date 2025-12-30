@@ -4,20 +4,19 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\Response;
 
 class ForceJsonResponse
 {
-    public function handle(Request $request, Closure $next)
+    public function handle(Request $request, Closure $next): Response
     {
-        if (!$request->headers->has('Accept')) {
-            $request->headers->set('Accept', 'application/json');
-        }
+        $request->headers->set('Accept', 'application/json');
+
+        /** @var \Symfony\Component\HttpFoundation\Response $response */
         $response = $next($request);
 
-        // تا جایی که ممکن است هدر JSON هم بگذاریم
-        if (method_exists($response, 'headers')) {
-            $response->headers->set('Content-Type', 'application/json; charset=utf-8');
-            $response->headers->set('Access-Control-Allow-Origin', '*');
+        if ($response->headers) {
+            $response->headers->set('Content-Type', 'application/json');
         }
 
         return $response;

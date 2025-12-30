@@ -1,0 +1,13 @@
+services:
+  products-db:
+    ports:
+      - "5433:5432"
+  inventory-db:
+    ports:
+      - "5434:5432"
+  orders-db:
+    ports:
+      - "5435:5432"
+  redis:
+    ports:
+      - "6381:6379"
