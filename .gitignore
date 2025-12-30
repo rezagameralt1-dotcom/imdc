@@ -22,3 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+scripts/smoke/.env
+# IMDC local backups / temp
+*.bak.*
+*.swp
+*.tmp
