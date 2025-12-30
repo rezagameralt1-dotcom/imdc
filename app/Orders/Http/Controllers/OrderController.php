@@ -3,6 +3,7 @@
 namespace App\Orders\Http\Controllers;
 
 use App\Http\Controllers\ApiController;
+use App\Core\Services\ShopCustomerResolver;
 use App\Orders\Http\Requests\CreateOrderRequest;
 use App\Orders\Http\Requests\PayOrderRequest;
 use App\Orders\Models\Order;
@@ -11,8 +12,10 @@ use Illuminate\Http\Request;
 
 class OrderController extends ApiController
 {
-    public function __construct(private readonly OrderService $service)
-    {
+    public function __construct(
+        private readonly OrderService $service,
+        private readonly ShopCustomerResolver $shopCustomerResolver,
+    ) {
     }
 
     public function index(Request $request)
@@ -32,9 +35,11 @@ class OrderController extends ApiController
     {
         $this->authorize('create', Order::class);
 
+        $shopCustomerId = $this->shopCustomerResolver->resolveForUserId($request->user()->id);
+
         $order = $this->service->create(
             $request->validated(),
-            $request->user(),
+            $shopCustomerId,
             $request->attributes->get('trace_id')
         );
 
@@ -56,7 +61,7 @@ class OrderController extends ApiController
 
         $this->authorize('update', $order);
 
-        $paid = $this->service->markPaid($order, $request->user(), $request->attributes->get('trace_id'));
+        $paid = $this->service->markPaid($order, $request->attributes->get('trace_id'));
 
         return $this->successResponse($paid);
     }
@@ -67,7 +72,7 @@ class OrderController extends ApiController
 
         $this->authorize('update', $order);
 
-        $cancelled = $this->service->cancel($order, $request->user());
+        $cancelled = $this->service->cancel($order);
 
         return $this->successResponse($cancelled);
     }

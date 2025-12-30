@@ -7,28 +7,25 @@ use App\Orders\Models\Order;
 
 class OrderPolicy
 {
-    private function isAuthenticated(User $user): bool
-    {
-        return (bool) $user->getAuthIdentifier();
-    }
-
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->hasRole(['admin', 'manager']) || $user->hasPermission('orders.manage');
     }
 
     public function view(User $user, Order $order): bool
     {
-        return true;
+        return $this->viewAny($user);
     }
 
     public function create(User $user): bool
     {
-        return $this->isAuthenticated($user);
+        return $user->hasRole(['admin', 'manager', 'customer']) || $user->hasPermission('orders.manage');
     }
 
     public function update(User $user, Order $order): bool
     {
-        return $this->isAuthenticated($user);
+        return $this->view($user, $order);
     }
 }
+
+

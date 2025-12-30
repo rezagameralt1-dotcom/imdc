@@ -3,14 +3,12 @@
 namespace App\Orders\Services;
 
 use App\Inventory\Services\InventoryService;
-use App\Models\User;
 use App\Orders\Models\Order;
 use App\Orders\Models\OrderItem;
 use App\Products\Models\Product;
 use App\Support\AuditLogger;
 use App\Support\Events\RedisStreamPublisher;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OrderService
@@ -22,7 +20,7 @@ class OrderService
     ) {
     }
 
-    public function create(array $payload, int|string|null $customerId, ?string $traceId = null): Order
+    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): Order
     {
         $itemsInput = $payload['items'] ?? [];
         if (empty($itemsInput)) {
@@ -36,12 +34,10 @@ class OrderService
 
         $meta = $payload['meta'] ?? [];
 
-        $customer = $this->ensureCustomer($customerId);
-
-        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $customer) {
+        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId) {
             /** @var Order $order */
             $order = Order::create([
-                'user_id' => $customer->id,
+                'shop_customer_id' => $shopCustomerId,
                 'status' => Order::STATUS_PENDING,
                 'total_amount' => 0,
                 'currency' => $currency,
@@ -84,7 +80,7 @@ class OrderService
         try {
             $reserved = $this->inventoryService->reserveForOrder(
                 $order->id,
-                (string) $customer->id,
+                $shopCustomerId,
                 $order->items->map(fn ($item) => [
                     'product_id' => $item->product_id,
                     'quantity' => $item->quantity,
@@ -106,7 +102,7 @@ class OrderService
 
         $this->publisher->publish('order.created', [
             'order_id' => $order->id,
-            'shop_customer_id' => (string) $customer->id,
+            'shop_customer_id' => $shopCustomerId,
             'items' => $order->items->map(fn ($item) => [
                 'product_id' => $item->product_id,
                 'quantity' => $item->quantity,
@@ -114,13 +110,7 @@ class OrderService
             'trace_id' => $traceId,
         ]);
 
-        $this->auditLogger->log(
-            'order.created',
-            $order,
-            null,
-            ['total' => $orderTotal, 'shop_customer_id' => (string) $customer->id],
-            $traceId
-        );
+        $this->auditLogger->log('order.created', $order, null, ['total' => $orderTotal, 'shop_customer_id' => $shopCustomerId], $traceId);
 
         return $order;
     }
@@ -206,28 +196,6 @@ class OrderService
         $this->auditLogger->log('order.cancelled', $order, null, [], $order->trace_id);
 
         return $order;
-    }
-
-    private function ensureCustomer(int|string|null $customerId = null): User
-    {
-        if ($customerId !== null) {
-            $existing = User::find($customerId);
-            if ($existing) {
-                return $existing;
-            }
-        }
-
-        $email = sprintf(
-            'order-customer-%s-%s@example.com',
-            now()->format('YmdHis'),
-            Str::random(6)
-        );
-
-        return User::create([
-            'name' => 'Order Customer',
-            'email' => $email,
-            'password' => Str::random(32),
-        ]);
     }
 }
 

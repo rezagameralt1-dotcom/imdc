@@ -8,9 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        $connection = Schema::getConnection()->getName();
-
-        if (! in_array($connection, ['core', 'pgsql'])) {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
             return;
         }
 
@@ -54,21 +52,19 @@ return new class extends Migration
 
         Schema::create('audit_logs', function (Blueprint $table) {
             $table->id();
-            $table->string('action');
-            $table->string('auditable_type');
-            $table->string('auditable_id');
+            $table->string('action', 128);
+            $table->string('auditable_type', 255);
+            $table->string('auditable_id', 36);
             $table->json('payload')->nullable();
             $table->unsignedBigInteger('user_id')->nullable();
-            $table->string('trace_id')->nullable()->index();
+            $table->string('trace_id', 36)->nullable()->index();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        $connection = Schema::getConnection()->getName();
-
-        if (! in_array($connection, ['core', 'pgsql'])) {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
             return;
         }
 

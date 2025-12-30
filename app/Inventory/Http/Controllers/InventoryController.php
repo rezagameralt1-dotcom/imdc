@@ -7,7 +7,6 @@ use App\Inventory\Http\Requests\AdjustInventoryRequest;
 use App\Inventory\Http\Requests\ReserveInventoryRequest;
 use App\Inventory\Models\InventoryItem;
 use App\Inventory\Services\InventoryService;
-use App\Orders\Models\Order;
 
 class InventoryController extends ApiController
 {
@@ -43,8 +42,7 @@ class InventoryController extends ApiController
 
         $adjusted = $this->service->adjustStock(
             $productId,
-            $request->integer('quantity'),
-            $request->user(),
+            $request->integer('delta'),
             $request->attributes->get('trace_id')
         );
 
@@ -53,15 +51,22 @@ class InventoryController extends ApiController
 
     public function reserve(ReserveInventoryRequest $request)
     {
-        $order = Order::with('items')->findOrFail($request->string('order_id'));
+        $items = [[
+            'product_id' => $request->string('product_id'),
+            'quantity' => $request->integer('qty'),
+        ]];
 
-        $this->authorize('view', $order);
-
-        $success = $this->service->reserveForOrder($order, $request->user());
+        $success = $this->service->reserveForOrder(
+            $request->string('order_id'),
+            $request->string('shop_customer_id'),
+            $items,
+            $request->attributes->get('trace_id')
+        );
 
         return $success
             ? $this->successResponse(['status' => 'reserved'])
             : $this->errorResponse('Reservation failed', 409);
     }
 }
+
 
