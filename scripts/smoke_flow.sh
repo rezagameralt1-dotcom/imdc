@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
-set -u
-set -o pipefail
+set -euo pipefail
 
-API_BASE="${API_BASE:-http://127.0.0.1:8000}"
-EMAIL="${EMAIL:-}"
-PASSWORD="${PASSWORD:-}"
-CUSTOMER_ID_OVERRIDE="${CUSTOMER_ID_OVERRIDE:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/smoke/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+: "${BASE_URL:=http://127.0.0.1:8000}"
+: "${API_BASE:=${BASE_URL}}"
+: "${CUSTOMER_ID_OVERRIDE:=${CUSTOMER_ID_OVERRIDE:-}}"
+
+rand_email() { printf "imdc-smoke-%s-%s@example.com" "$(date +%s)" "$RANDOM"; }
+
+if [[ -z "${EMAIL:-}" ]]; then EMAIL="$(rand_email)"; fi
+if [[ -z "${PASSWORD:-}" ]]; then PASSWORD="Passw0rd!123"; fi
 
 fail() { echo "ERROR: $*" >&2; FAILED=1; }
 

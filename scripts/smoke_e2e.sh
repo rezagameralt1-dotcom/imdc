@@ -1,9 +1,23 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-API_BASE="${API_BASE:-http://127.0.0.1:8000}"
-EMAIL="${EMAIL:-}"
-PASSWORD="${PASSWORD:-}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/smoke/.env"
+
+if [[ -f "$ENV_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+fi
+
+: "${BASE_URL:=http://127.0.0.1:8000}"
+: "${API_BASE:=${BASE_URL}}"
+
+rand_email() { printf "imdc-smoke-%s-%s@example.com" "$(date +%s)" "$RANDOM"; }
+
+if [[ -z "${EMAIL:-}" ]]; then EMAIL="$(rand_email)"; fi
+if [[ -z "${PASSWORD:-}" ]]; then PASSWORD="Passw0rd!123"; fi
 
 curl_call() {
   local method="$1"; shift
