@@ -53,14 +53,10 @@ ensure_var "$EMAIL" "EMAIL"
 ensure_var "$PASSWORD" "PASSWORD"
 
 echo "Register..."
-
-curl -sS -X POST "$BASE_URL/api/v1/auth/register" \
-
-  -H "Content-Type: application/json" \
-
-  -d "{\"name\":\"Smoke User\",\"email\":\"$EMAIL\",\"password\":\"$PASSWORD\",\"password_confirmation\":\"$PASSWORD\"}" >/dev/null
+curl -sS -X POST "/api/v1/auth/register" -H "Content-Type: application/json" -d "{\"name\":\"Smoke User\",\"email\":\"\",\"password\":\"\",\"password_confirmation\":\"\"}" >/dev/null
 
 echo "Login..."
+"
 LOGIN_RESP="$(curl_json POST "$API_BASE/api/v1/auth/login" -d '{"email":"'"$EMAIL"'","password":"'"$PASSWORD"'"}')"
 TOKEN="$(printf '%s' "$LOGIN_RESP" | json_get "data.token")"
 if [[ -z "$TOKEN" ]]; then fail "Token missing"; fi
