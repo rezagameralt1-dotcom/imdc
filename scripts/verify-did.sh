@@ -36,12 +36,9 @@ echo
 echo "Execution context: ${EXEC_CTX}"
 echo
 
-# Check FEATURE_DID flag
-if [[ "${FEATURE_DID:-false}" != "true" ]]; then
-    echo "FEATURE_DID is not enabled (FEATURE_DID=${FEATURE_DID:-false})"
-    echo "SKIPPED: DID verification"
-    exit 0
-fi
+# Guardrail ALWAYS runs - temporarily enables DID for the duration of the script
+echo "Guardrail: Temporarily enabling FEATURE_DID for verification..."
+echo
 
 # Export FEATURE_DID=true for all child processes (artisan, curl, etc.)
 export FEATURE_DID=true
@@ -56,6 +53,7 @@ cleanup() {
     rm -f "$TMP_BODY" 2>/dev/null || true
     # Restore .env if it was backed up
     if [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]] && [[ -n "$ENV_FILE" ]]; then
+        echo "Restoring original .env file..."
         if [[ -f "$ENV_FILE" ]]; then
             mv "$ENV_BACKUP" "$ENV_FILE" 2>/dev/null || true
             # Clear caches after restore
@@ -70,6 +68,7 @@ if [[ -f "$ENV_FILE" ]]; then
     TIMESTAMP="$(date +%s)"
     ENV_BACKUP="${ENV_FILE}.bak.verify-did.${TIMESTAMP}"
     cp -a "$ENV_FILE" "$ENV_BACKUP"
+    echo "  ✓ Backed up .env to ${ENV_BACKUP}"
     
     # Ensure FEATURE_DID=true is set in .env
     if grep -qE "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null; then
@@ -81,11 +80,17 @@ if [[ -f "$ENV_FILE" ]]; then
             # Linux sed
             sed -i 's/^FEATURE_DID=.*/FEATURE_DID=true/' "$ENV_FILE"
         fi
+        echo "  ✓ Updated FEATURE_DID=true in .env"
     else
         # Append if not exists
         echo "FEATURE_DID=true" >> "$ENV_FILE"
+        echo "  ✓ Added FEATURE_DID=true to .env"
     fi
-    
+else
+    echo "  ⚠ .env file not found at ${ENV_FILE}"
+    echo "  Guardrail will attempt to run with exported FEATURE_DID=true"
+    echo "  Note: php-fpm workers may not see the env variable without .env file"
+    echo
 fi
 
 # Determine API base URL
@@ -100,6 +105,29 @@ fi
 echo "API Base URL: ${API_BASE_URL}"
 echo
 
+# Pre-flight: Clear caches to ensure FEATURE_DID from .env is read at runtime
+echo "Pre-flight: Clearing caches to ensure FEATURE_DID from .env is read at runtime..."
+echo
+set +e
+php artisan config:clear 2>/dev/null || true
+php artisan cache:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
+set -e
+echo "    ✓ Caches cleared (config, cache, route)"
+echo
+
+# Debug: Show effective FEATURE_DID value from .env
+echo "Debug: Verifying FEATURE_DID is enabled..."
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_DID_FROM_ENV="$(grep -E "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
+    echo "  FEATURE_DID from .env: ${FEATURE_DID_FROM_ENV}"
+    if [[ "$FEATURE_DID_FROM_ENV" != "true" ]]; then
+        echo "  ⚠ WARNING: FEATURE_DID in .env is not 'true'"
+    fi
+else
+    echo "  .env file not found - using exported FEATURE_DID=${FEATURE_DID:-not set}"
+fi
+echo
 
 curl_http_code() {
     local url="$1"
