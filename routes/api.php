@@ -21,16 +21,35 @@ Route::prefix('v1')->group(function () {
         });
 
         // User info endpoint
-        Route::get('me', [\App\Http\Controllers\Api\MeController::class]);
+        if (class_exists(\App\Http\Controllers\Api\MeController::class)) {
+            Route::get('me', [\App\Http\Controllers\Api\MeController::class]);
+        } elseif (class_exists(\App\Http\Controllers\MeController::class)) {
+            Route::get('me', [\App\Http\Controllers\MeController::class]);
+        } else {
+            Route::get('me', function () {
+                return response()->json([
+                    'success' => false,
+                    'error' => [
+                        'code' => 'ME_CONTROLLER_MISSING',
+                        'message' => 'MeController not installed'
+                    ],
+                    'trace_id' => 'local'
+                ], 501);
+            });
+        }
         Route::get('auth/me', [AuthController::class, 'me']); // Keep for backward compatibility
         
         // RBAC-protected health endpoints
         // Admin ping: requires Admin role only (LOCKED - stable baseline)
-        Route::get('admin/ping', [\App\Http\Controllers\Api\AdminPingController::class])
-            ->middleware('role:Admin');
+        if (class_exists(\App\Http\Controllers\Api\AdminPingController::class)) {
+            Route::get('admin/ping', [\App\Http\Controllers\Api\AdminPingController::class])
+                ->middleware('role:Admin');
+        }
         // Access policy: Admin OR Auditor (locked).
-        Route::get('audit/ping', [\App\Http\Controllers\Api\AuditPingController::class])
-            ->middleware('role:Admin,Auditor');
+        if (class_exists(\App\Http\Controllers\Api\AuditPingController::class)) {
+            Route::get('audit/ping', [\App\Http\Controllers\Api\AuditPingController::class])
+                ->middleware('role:Admin,Auditor');
+        }
         
         Route::post('auth/logout', [AuthController::class, 'logout']);
 
@@ -61,13 +80,32 @@ Route::middleware(['auth:sanctum'])->prefix('market')->group(function () {
 
 // RBAC smoke-test endpoints (without /v1 prefix)
 Route::middleware('auth:sanctum')->group(function () {
-    Route::get('/me', \App\Http\Controllers\Api\MeController::class);
+    if (class_exists(\App\Http\Controllers\Api\MeController::class)) {
+        Route::get('/me', \App\Http\Controllers\Api\MeController::class);
+    } elseif (class_exists(\App\Http\Controllers\MeController::class)) {
+        Route::get('/me', \App\Http\Controllers\MeController::class);
+    } else {
+        Route::get('/me', function () {
+            return response()->json([
+                'success' => false,
+                'error' => [
+                    'code' => 'ME_CONTROLLER_MISSING',
+                    'message' => 'MeController not installed'
+                ],
+                'trace_id' => 'local'
+            ], 501);
+        });
+    }
     // Admin ping: requires Admin role only (LOCKED - stable baseline)
-    Route::get('/admin/ping', \App\Http\Controllers\Api\AdminPingController::class)
-        ->middleware('role:Admin');
+    if (class_exists(\App\Http\Controllers\Api\AdminPingController::class)) {
+        Route::get('/admin/ping', \App\Http\Controllers\Api\AdminPingController::class)
+            ->middleware('role:Admin');
+    }
     // Access policy: Admin OR Auditor (locked).
-    Route::get('/audit/ping', \App\Http\Controllers\Api\AuditPingController::class)
-        ->middleware('role:Admin,Auditor');
+    if (class_exists(\App\Http\Controllers\Api\AuditPingController::class)) {
+        Route::get('/audit/ping', \App\Http\Controllers\Api\AuditPingController::class)
+            ->middleware('role:Admin,Auditor');
+    }
 });
 
 
