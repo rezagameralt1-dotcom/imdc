@@ -245,6 +245,63 @@ else
 fi
 echo
 
+# Check 3.7: Pharma guardrail (if FEATURE_PHARMA enabled)
+echo "Check 3.7: Pharma guardrail (if FEATURE_PHARMA enabled)..."
+FEATURE_PHARMA_ENABLED=false
+FEATURE_PHARMA_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_PHARMA_FROM_ENV="$(grep -E "^FEATURE_PHARMA=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_PHARMA_FROM_ENV" ]]; then
+        FEATURE_PHARMA_VALUE="$FEATURE_PHARMA_FROM_ENV"
+        FEATURE_PHARMA_NORMALIZED="$(echo "$FEATURE_PHARMA_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_PHARMA_NORMALIZED" == "true" ]] || [[ "$FEATURE_PHARMA_NORMALIZED" == "1" ]] || [[ "$FEATURE_PHARMA_NORMALIZED" == "yes" ]] || [[ "$FEATURE_PHARMA_NORMALIZED" == "on" ]]; then
+            FEATURE_PHARMA_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_PHARMA_VALUE" ]]; then
+    FEATURE_PHARMA_VALUE="${FEATURE_PHARMA:-false}"
+    if [[ "$FEATURE_PHARMA_VALUE" == "true" ]] || [[ "$FEATURE_PHARMA_VALUE" == "1" ]]; then
+        FEATURE_PHARMA_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_PHARMA_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-pharma.sh" ]]; then
+        PHARMA_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_PHARMA=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-pharma.sh --in-container > /tmp/pharma_guardrail_output.txt 2>&1 || PHARMA_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_PHARMA=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-pharma.sh --in-container" > /tmp/pharma_guardrail_output.txt 2>&1 || PHARMA_EXIT=$?
+        else
+            FEATURE_PHARMA=true "$SCRIPT_DIR/verify-pharma.sh" > /tmp/pharma_guardrail_output.txt 2>&1 || PHARMA_EXIT=$?
+        fi
+        
+        if [[ $PHARMA_EXIT -eq 0 ]]; then
+            if grep -q "All pharma tests PASSED" /tmp/pharma_guardrail_output.txt; then
+                echo "✓ Pharma guardrail PASSED"
+            else
+                echo "✗ Pharma guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Pharma guardrail execution failed (exit code: $PHARMA_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-pharma.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_PHARMA is not enabled (FEATURE_PHARMA=${FEATURE_PHARMA_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 

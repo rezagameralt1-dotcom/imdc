@@ -20,6 +20,7 @@ class EnsureFeatureEnabled
                     'nft' => config('nft.enabled', false),
                     'did' => env('FEATURE_DID', false),
                     'dao' => config('dao.enabled', false),
+                    'pharma' => config('pharma.enabled', false),
                     default => false,
                 };
 

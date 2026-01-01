@@ -96,6 +96,16 @@ Route::prefix('v1')->group(function () {
             Route::post('proposals/{id}/vote', [\App\Http\Controllers\Api\Dao\DaoVoteController::class, 'store'])
                 ->middleware('role:Admin');
         });
+
+        // Pharma routes (always registered; feature flag checked by middleware)
+        Route::middleware(['feature:pharma'])->prefix('pharma')->group(function () {
+            Route::get('drugs', [\App\Http\Controllers\Api\Pharma\PharmaDrugController::class, 'index'])
+                ->middleware('role:Admin|Auditor');
+            Route::get('drugs/{id}', [\App\Http\Controllers\Api\Pharma\PharmaDrugController::class, 'show'])
+                ->middleware('role:Admin|Auditor');
+            Route::post('check', [\App\Http\Controllers\Api\Pharma\PharmaCheckController::class, 'check'])
+                ->middleware('role:Admin');
+        });
     });
 });
 

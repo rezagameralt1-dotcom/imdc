@@ -61,6 +61,11 @@ final class CoreRbacSeeder extends Seeder
             ['name' => 'dao.vote',         'description' => 'Cast votes on proposals'],
             ['name' => 'dao.read',         'description' => 'Read proposals and results'],
             ['name' => 'dao.admin',        'description' => 'Administer all DAO operations'],
+
+            // Pharma permissions
+            ['name' => 'pharma.read',      'description' => 'Read drug information'],
+            ['name' => 'pharma.check',     'description' => 'Check drug interactions'],
+            ['name' => 'pharma.admin',     'description' => 'Administer all pharma operations'],
         ];
 
         foreach ($permissions as $p) {
@@ -108,6 +113,7 @@ final class CoreRbacSeeder extends Seeder
             'did.manage.self',
             'linking.create', 'linking.read', 'linking.admin',
             'dao.create', 'dao.vote', 'dao.read', 'dao.admin',
+            'pharma.read', 'pharma.check', 'pharma.admin',
         ]);
 
         $attach($managerRoleId, [
