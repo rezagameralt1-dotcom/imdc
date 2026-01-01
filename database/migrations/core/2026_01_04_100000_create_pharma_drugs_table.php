@@ -27,7 +27,8 @@ return new class extends Migration
             $table->jsonb('metadata')->nullable();
             $table->timestamps();
 
-            $table->index(['name']);
+            // Indexes (created once, no duplicates)
+            // Note: unique() on 'name' already creates an index, so we don't need $table->index(['name'])
             $table->index(['generic_name']);
         });
     }

@@ -21,9 +21,11 @@ return new class extends Migration
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->string('event_type');
             $table->jsonb('payload');
-            $table->uuid('actor_user_id')->nullable()->index()->comment('User ID from core DB');
+            $table->uuid('actor_user_id')->nullable()->comment('User ID from core DB');
             $table->text('trace_id')->nullable();
             $table->timestamp('created_at')->useCurrent();
+
+            // Indexes (created once, no duplicates)
             $table->index(['event_type']);
             $table->index(['actor_user_id']);
             $table->index(['trace_id']);
