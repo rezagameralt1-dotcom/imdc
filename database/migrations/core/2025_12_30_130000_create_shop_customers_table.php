@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::getConnection()->getName() !== 'pgsql') {
+        if (Schema::hasTable('shop_customers')) {
             return;
         }
 
@@ -22,10 +22,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        if (Schema::getConnection()->getName() !== 'pgsql') {
-            return;
-        }
-
         Schema::dropIfExists('shop_customers');
     }
 };
