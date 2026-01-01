@@ -16,10 +16,87 @@ echo "Docker CLI: $([[ "$HAS_DOCKER" == "1" ]] && echo "present" || echo "missin
 echo
 
 echo "0. Checking Spatie middleware classes autoload..."
-php -r 'require "vendor/autoload.php"; $classes=["Spatie\\\\Permission\\\\Middleware\\\\RoleMiddleware","Spatie\\\\Permission\\\\Middleware\\\\PermissionMiddleware","Spatie\\\\Permission\\\\Middleware\\\\RoleOrPermissionMiddleware"]; foreach($classes as $c){ if(!class_exists($c)){fwrite(STDERR,"MISSING: $c\n"); exit(1);} }' >/dev/null
-echo "✓ Spatie RoleMiddleware autoloadable"
-echo "✓ Spatie PermissionMiddleware autoloadable"
-echo "✓ Spatie RoleOrPermissionMiddleware autoloadable"
+
+php -r '
+require "vendor/autoload.php";
+
+function resolveFqcnFromFile(string $file): ?string {
+  if (!is_file($file)) return null;
+  $src = file_get_contents($file);
+  if ($src === false) return null;
+
+  // namespace Foo\Bar;
+  if (!preg_match("/^namespace\s+([^;]+);/m", $src, $m)) return null;
+  $ns = trim($m[1]);
+
+  // class ClassName
+  if (!preg_match("/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\b/", $src, $c)) return null;
+  $cls = trim($c[1]);
+
+  return $ns . "\\\\" . $cls;
+}
+
+function findFirst(array $paths): ?string {
+  foreach ($paths as $p) if (is_file($p)) return $p;
+  return null;
+}
+
+$base = "vendor/spatie/laravel-permission/src";
+
+// try common locations first, then fallback to glob search
+$targets = [
+  "role" => [
+    $base."/Middleware/RoleMiddleware.php",
+    $base."/Middlewares/RoleMiddleware.php",
+  ],
+  "permission" => [
+    $base."/Middleware/PermissionMiddleware.php",
+    $base."/Middlewares/PermissionMiddleware.php",
+  ],
+  "role_or_permission" => [
+    $base."/Middleware/RoleOrPermissionMiddleware.php",
+    $base."/Middlewares/RoleOrPermissionMiddleware.php",
+  ],
+];
+
+$resolved = [];
+foreach ($targets as $key => $candidates) {
+  $file = findFirst($candidates);
+
+  // fallback: locate by filename anywhere under src
+  if (!$file) {
+    $name = basename($candidates[0]); // e.g. RoleMiddleware.php
+    $hits = glob($base."/**/".$name, GLOB_BRACE);
+    if ($hits && count($hits) > 0) $file = $hits[0];
+  }
+
+  if (!$file) {
+    fwrite(STDERR, "MISSING FILE for $key (expected under $base)\n");
+    exit(1);
+  }
+
+  $fqcn = resolveFqcnFromFile($file);
+  if (!$fqcn) {
+    fwrite(STDERR, "FAILED to resolve namespace/class from file: $file\n");
+    exit(1);
+  }
+
+  if (!class_exists($fqcn)) {
+    fwrite(STDERR, "MISSING CLASS: $fqcn (from $file)\n");
+    exit(1);
+  }
+
+  $resolved[$key] = $fqcn;
+}
+
+echo "RESOLVED role=".$resolved["role"].PHP_EOL;
+echo "RESOLVED permission=".$resolved["permission"].PHP_EOL;
+echo "RESOLVED role_or_permission=".$resolved["role_or_permission"].PHP_EOL;
+' | sed -n '1,30p'
+
+echo "✓ Spatie RoleMiddleware autoloadable (resolved)"
+echo "✓ Spatie PermissionMiddleware autoloadable (resolved)"
+echo "✓ Spatie RoleOrPermissionMiddleware autoloadable (resolved)"
 echo
 
 # Run app-provided self-check if exists
@@ -30,9 +107,6 @@ if php artisan list --format=txt 2>/dev/null | grep -qE '^ +imdc:verify-permissi
   echo
 fi
 
-# If docker CLI exists AND we are not in container: keep legacy docker-based checks if script had them
-# For simplicity and stability: always run Laravel-native checks below (work both host+container).
-# (No Auth/RBAC logic changes; only guardrails.)
 echo "1. Checking legacy RBAC tables are absent..."
 php artisan tinker --execute='
 $pdo = DB::connection(config("database.default"))->getPdo();
@@ -99,7 +173,7 @@ if ($dup > 0) { throw new \RuntimeException("duplicate_permissions=".$dup); }
 echo "✓ No duplicate permission names"
 echo
 
-echo "7. Verifying Spatie Role count matches Core DB..."
+echo "7. Verifying Spatie Role count looks sane..."
 php artisan tinker --execute='
 $count = DB::table("roles")->where("guard_name","sanctum")->count();
 if ($count <= 0) { throw new \RuntimeException("role_count=".$count); }
@@ -118,7 +192,7 @@ echo "Config guard: ".$authGuard.PHP_EOL;
 if ($conn === "" || $guardName !== "sanctum" || $authGuard === "") {
   throw new \RuntimeException("Config values incorrect");
 }
-' 
+'
 echo "✓ Config values look correct"
 echo
 
