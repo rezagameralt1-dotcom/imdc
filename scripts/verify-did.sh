@@ -43,6 +43,9 @@ if [[ "${FEATURE_DID:-false}" != "true" ]]; then
     exit 0
 fi
 
+# Export FEATURE_DID=true for all child processes (artisan, curl, etc.)
+export FEATURE_DID=true
+
 # Determine API base URL
 if [[ -n "${IMDC_API_BASE_URL:-}" ]]; then
     API_BASE_URL="${IMDC_API_BASE_URL}"
@@ -88,11 +91,27 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
+# Pre-flight: Clear caches to ensure FEATURE_DID env is read at runtime
+echo "Pre-flight: Clearing caches to ensure FEATURE_DID is read at runtime..."
+echo
+set +e
+php artisan config:clear 2>/dev/null || true
+php artisan cache:clear 2>/dev/null || true
+set -e
+echo "    ✓ Caches cleared"
+echo
+
+# Debug: Show effective FEATURE_DID value
+echo "Debug: Checking FEATURE_DID environment variable..."
+FEATURE_DID_DEBUG="$(php -r 'echo "FEATURE_DID=".(getenv("FEATURE_DID")?: "not set").PHP_EOL;' 2>/dev/null || echo "FEATURE_DID=check failed")"
+echo "  $FEATURE_DID_DEBUG"
+echo
+
 # Pre-flight: Run core migrations (for did_profiles table)
 echo "Pre-flight: Running core migrations..."
 echo
 set +e
-CORE_MIGRATE_OUTPUT="$(php artisan migrate --force --database=core --path=database/migrations/core 2>&1)"
+CORE_MIGRATE_OUTPUT="$(FEATURE_DID=true php artisan migrate --force --database=core --path=database/migrations/core 2>&1)"
 CORE_MIGRATE_EXIT=$?
 set -e
 if [[ $CORE_MIGRATE_EXIT -ne 0 ]]; then
@@ -106,8 +125,8 @@ echo
 # Pre-flight: Clear route cache and verify DID routes exist
 echo "Pre-flight: Clearing route cache and verifying DID routes are registered..."
 set +e
-php artisan route:clear 2>/dev/null || true
-ROUTE_CHECK="$(php artisan route:list --path=api/v1/did/me 2>&1)"
+FEATURE_DID=true php artisan route:clear 2>/dev/null || true
+ROUTE_CHECK="$(FEATURE_DID=true php artisan route:list --path=api/v1/did/me 2>&1)"
 ROUTE_CHECK_EXIT=$?
 set -e
 if [[ $ROUTE_CHECK_EXIT -ne 0 ]] || ! echo "$ROUTE_CHECK" | grep -qE "(did/me|did\.me)"; then
@@ -141,7 +160,7 @@ echo
 # Test 1: Mint authentication token (use admin user)
 echo "Test 1: Minting authentication token for admin user..."
 set +e
-TOKEN="$(php artisan imdc:mint-debug-token --email=admin@imdc.local --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
+TOKEN="$(FEATURE_DID=true php artisan imdc:mint-debug-token --email=admin@imdc.local --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
 TOKEN_EXIT=$?
 set -e
 
@@ -286,7 +305,7 @@ echo
 # Test 6: Verify database write
 echo "Test 6: Verifying database write..."
 set +e
-DB_CHECK="$(php artisan tinker --execute="
+DB_CHECK="$(FEATURE_DID=true php artisan tinker --execute="
 try {
     \$profile = \App\Dids\Models\DidProfile::where('user_id', ${USER_ID})->first();
     if (!\$profile) {

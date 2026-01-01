@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Did;
 
 use App\Http\Controllers\ApiController;
 use App\Services\Did\DidService;
+use App\Support\DidFeatureGate;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -22,8 +23,8 @@ class DidMeController extends ApiController
      */
     public function show(Request $request): JsonResponse
     {
-        // Check feature flag
-        if (!config('did.enabled', false)) {
+        // Check feature flag (runtime env check, bypasses config cache)
+        if (!DidFeatureGate::isEnabled()) {
             return $this->errorResponse('DID feature is not enabled', 404);
         }
 
@@ -50,8 +51,8 @@ class DidMeController extends ApiController
      */
     public function store(Request $request): JsonResponse
     {
-        // Check feature flag
-        if (!config('did.enabled', false)) {
+        // Check feature flag (runtime env check, bypasses config cache)
+        if (!DidFeatureGate::isEnabled()) {
             return $this->errorResponse('DID feature is not enabled', 404);
         }
 
@@ -80,8 +81,8 @@ class DidMeController extends ApiController
      */
     public function update(Request $request): JsonResponse
     {
-        // Check feature flag
-        if (!config('did.enabled', false)) {
+        // Check feature flag (runtime env check, bypasses config cache)
+        if (!DidFeatureGate::isEnabled()) {
             return $this->errorResponse('DID feature is not enabled', 404);
         }
 
