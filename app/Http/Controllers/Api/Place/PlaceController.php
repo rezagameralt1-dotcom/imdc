@@ -50,7 +50,9 @@ class PlaceController extends ApiController
             
             return $this->successResponse($place);
         } catch (DomainException $e) {
-            return $this->errorResponse($e->getMessage(), 422);
+            // Return 404 for not found, 422 for invalid UUID format
+            $statusCode = str_contains($e->getMessage(), 'not found') ? 404 : 422;
+            return $this->errorResponse($e->getMessage(), $statusCode);
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to retrieve place: ' . $e->getMessage(), 500);
         }
