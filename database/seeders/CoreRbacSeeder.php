@@ -55,6 +55,12 @@ final class CoreRbacSeeder extends Seeder
             ['name' => 'linking.create',   'description' => 'Create entity links'],
             ['name' => 'linking.read',     'description' => 'Read entity links'],
             ['name' => 'linking.admin',    'description' => 'Admin linking operations'],
+
+            // DAO permissions
+            ['name' => 'dao.create',       'description' => 'Create DAO proposals'],
+            ['name' => 'dao.vote',         'description' => 'Cast votes on proposals'],
+            ['name' => 'dao.read',         'description' => 'Read proposals and results'],
+            ['name' => 'dao.admin',        'description' => 'Administer all DAO operations'],
         ];
 
         foreach ($permissions as $p) {
@@ -101,6 +107,7 @@ final class CoreRbacSeeder extends Seeder
             'nft.mint', 'nft.transfer', 'nft.read',
             'did.manage.self',
             'linking.create', 'linking.read', 'linking.admin',
+            'dao.create', 'dao.vote', 'dao.read', 'dao.admin',
         ]);
 
         $attach($managerRoleId, [

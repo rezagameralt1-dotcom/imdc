@@ -188,6 +188,63 @@ else
 fi
 echo
 
+# Check 3.6: DAO guardrail (if FEATURE_DAO enabled)
+echo "Check 3.6: DAO guardrail (if FEATURE_DAO enabled)..."
+FEATURE_DAO_ENABLED=false
+FEATURE_DAO_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_DAO_FROM_ENV="$(grep -E "^FEATURE_DAO=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_DAO_FROM_ENV" ]]; then
+        FEATURE_DAO_VALUE="$FEATURE_DAO_FROM_ENV"
+        FEATURE_DAO_NORMALIZED="$(echo "$FEATURE_DAO_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_DAO_NORMALIZED" == "true" ]] || [[ "$FEATURE_DAO_NORMALIZED" == "1" ]] || [[ "$FEATURE_DAO_NORMALIZED" == "yes" ]] || [[ "$FEATURE_DAO_NORMALIZED" == "on" ]]; then
+            FEATURE_DAO_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_DAO_VALUE" ]]; then
+    FEATURE_DAO_VALUE="${FEATURE_DAO:-false}"
+    if [[ "$FEATURE_DAO_VALUE" == "true" ]] || [[ "$FEATURE_DAO_VALUE" == "1" ]]; then
+        FEATURE_DAO_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_DAO_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-dao.sh" ]]; then
+        DAO_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_DAO=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-dao.sh --in-container > /tmp/dao_guardrail_output.txt 2>&1 || DAO_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_DAO=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-dao.sh --in-container" > /tmp/dao_guardrail_output.txt 2>&1 || DAO_EXIT=$?
+        else
+            FEATURE_DAO=true "$SCRIPT_DIR/verify-dao.sh" > /tmp/dao_guardrail_output.txt 2>&1 || DAO_EXIT=$?
+        fi
+        
+        if [[ $DAO_EXIT -eq 0 ]]; then
+            if grep -q "All DAO tests PASSED" /tmp/dao_guardrail_output.txt; then
+                echo "✓ DAO guardrail PASSED"
+            else
+                echo "✗ DAO guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ DAO guardrail execution failed (exit code: $DAO_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-dao.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_DAO is not enabled (FEATURE_DAO=${FEATURE_DAO_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 

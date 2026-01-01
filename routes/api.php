@@ -84,6 +84,18 @@ Route::prefix('v1')->group(function () {
             Route::get('nft/{nftId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByNft'])
                 ->middleware('role:Admin|Auditor');
         });
+
+        // DAO routes (always registered; feature flag checked by middleware)
+        Route::middleware(['feature:dao'])->prefix('dao')->group(function () {
+            Route::post('proposals', [\App\Http\Controllers\Api\Dao\DaoProposalController::class, 'store'])
+                ->middleware('role:Admin');
+            Route::get('proposals', [\App\Http\Controllers\Api\Dao\DaoProposalController::class, 'index'])
+                ->middleware('role:Admin|Auditor');
+            Route::get('proposals/{id}', [\App\Http\Controllers\Api\Dao\DaoProposalController::class, 'show'])
+                ->middleware('role:Admin|Auditor');
+            Route::post('proposals/{id}/vote', [\App\Http\Controllers\Api\Dao\DaoVoteController::class, 'store'])
+                ->middleware('role:Admin');
+        });
     });
 });
 

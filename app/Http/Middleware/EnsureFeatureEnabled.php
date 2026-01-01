@@ -15,12 +15,13 @@ class EnsureFeatureEnabled
      */
     public function handle(Request $request, Closure $next, string $feature): Response
     {
-        $enabled = match($feature) {
-            'linking' => config('linking.enabled', false),
-            'nft' => config('nft.enabled', false),
-            'did' => env('FEATURE_DID', false),
-            default => false,
-        };
+                $enabled = match($feature) {
+                    'linking' => config('linking.enabled', false),
+                    'nft' => config('nft.enabled', false),
+                    'did' => env('FEATURE_DID', false),
+                    'dao' => config('dao.enabled', false),
+                    default => false,
+                };
 
         if (!$enabled) {
             return response()->json([
