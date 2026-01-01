@@ -33,7 +33,7 @@ function resolveFqcnFromFile(string $file): ?string {
   if (!preg_match("/\bclass\s+([A-Za-z_][A-Za-z0-9_]*)\b/", $src, $c)) return null;
   $cls = trim($c[1]);
 
-  return $ns . "\\\\" . $cls;
+  return $ns . "\\" . $cls;
 }
 
 function findFirst(array $paths): ?string {
