@@ -19,11 +19,11 @@ class NftMintService
      *
      * @param string $contract
      * @param string $tokenId
-     * @param string $ownerUserId
+     * @param int|string $ownerUserId
      * @param string|null $metadataUri
      * @return NftToken
      */
-    public function mint(string $contract, string $tokenId, string $ownerUserId, ?string $metadataUri = null): NftToken
+    public function mint(string $contract, string $tokenId, int|string $ownerUserId, ?string $metadataUri = null): NftToken
     {
         return DB::connection('nfts')->transaction(function () use ($contract, $tokenId, $ownerUserId, $metadataUri) {
             // Check if token already exists

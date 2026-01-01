@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        Schema::create('accounting_vouchers', function (Blueprint $table) {
+        Schema::connection('core')->create('accounting_vouchers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('order_id')->nullable()->constrained('orders')->cascadeOnDelete();
+            $table->unsignedBigInteger('order_id')->nullable(); // No FK - orders table is in orders DB
             $table->string('type', 16);   // INVOICE, RECEIPT, REFUND
             $table->decimal('amount', 12, 2)->default(0);
             $table->string('status', 16)->default('pending'); // pending, synced, failed
@@ -16,11 +16,11 @@ return new class extends Migration {
             $table->timestamp('synced_at')->nullable();
             $table->timestamps();
         });
-        Schema::table('accounting_vouchers', function (Blueprint $table) {
+        Schema::connection('core')->table('accounting_vouchers', function (Blueprint $table) {
             $table->index(['order_id', 'type', 'status']);
         });
     }
     public function down(): void {
-        Schema::dropIfExists('accounting_vouchers');
+        Schema::connection('core')->dropIfExists('accounting_vouchers');
     }
 };

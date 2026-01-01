@@ -58,7 +58,7 @@ return new class extends Migration
         if (!Schema::connection('core')->hasTable('accounting_voucher_entries')) {
             Schema::connection('core')->create('accounting_voucher_entries', function (Blueprint $table) {
                 $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
-                $table->uuid('voucher_id'); // FK to accounting_vouchers.id (uuid)
+                $table->unsignedBigInteger('voucher_id'); // FK to accounting_vouchers.id (bigint)
                 $table->string('account_code', 50);
                 $table->string('account_name');
                 $table->decimal('debit', 15, 2)->default(0);
@@ -67,7 +67,7 @@ return new class extends Migration
                 $table->integer('sequence')->default(0);
                 $table->timestamps();
                 
-                // Foreign key: voucher_id (uuid) -> accounting_vouchers.id (uuid)
+                // Foreign key: voucher_id (bigint) -> accounting_vouchers.id (bigint)
                 $table->foreign('voucher_id')->references('id')->on('accounting_vouchers')->onDelete('cascade');
                 $table->index('voucher_id');
             });

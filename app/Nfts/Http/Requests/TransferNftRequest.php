@@ -3,6 +3,7 @@
 namespace App\Nfts\Http\Requests;
 
 use App\Http\Requests\BaseApiRequest;
+use App\Rules\ExistsInCoreUsers;
 
 class TransferNftRequest extends BaseApiRequest
 {
@@ -10,7 +11,8 @@ class TransferNftRequest extends BaseApiRequest
     {
         return [
             'token_uuid' => ['required', 'uuid'],
-            'to_user_id' => ['required', 'uuid'],
+            'to_user_id' => ['required', 'integer', 'min:1', new ExistsInCoreUsers()],
+            'idempotency_key' => ['nullable', 'string', 'max:128'],
         ];
     }
 

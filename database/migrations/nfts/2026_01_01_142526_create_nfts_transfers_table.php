@@ -14,10 +14,10 @@ return new class extends Migration
         Schema::connection('nfts')->create('nfts_transfers', function (Blueprint $table) {
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->uuid('token_id');
-            $table->uuid('from_user_id')->nullable();
-            $table->uuid('to_user_id');
+            $table->unsignedBigInteger('from_user_id')->nullable(); // No FK - users table is in core DB
+            $table->unsignedBigInteger('to_user_id'); // No FK - users table is in core DB
             $table->string('idempotency_key')->nullable();
-            $table->uuid('requested_by_user_id');
+            $table->unsignedBigInteger('requested_by_user_id'); // No FK - users table is in core DB
             $table->enum('status', ['pending', 'committed', 'rejected'])->default('committed');
             $table->timestamps();
 

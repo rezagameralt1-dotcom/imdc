@@ -9,16 +9,19 @@ class NftPolicy
 {
     public function mint(User $user): bool
     {
-        return $user->hasPermission('nft.mint');
+        // Allow admins or users with nft.mint permission
+        return $user->hasRole('Admin') || $user->hasPermission('nft.mint');
     }
 
     public function transfer(User $user): bool
     {
-        return $user->hasPermission('nft.transfer');
+        // Allow admins or users with nft.transfer permission
+        return $user->hasRole('Admin') || $user->hasPermission('nft.transfer');
     }
 
     public function read(User $user): bool
     {
-        return $user->hasPermission('nft.read');
+        // Allow admins or users with nft.read permission
+        return $user->hasRole('Admin') || $user->hasPermission('nft.read');
     }
 }

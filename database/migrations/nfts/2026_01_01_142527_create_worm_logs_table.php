@@ -18,7 +18,7 @@ return new class extends Migration
             $table->uuid('entity_id');
             $table->jsonb('payload_json');
             $table->string('prev_hash')->nullable();
-            $table->string('hash');
+            $table->string('hash')->nullable(); // Allow NULL initially, will be set after insert
             $table->timestamp('created_at');
 
             $table->index('event_type');
@@ -29,11 +29,25 @@ return new class extends Migration
 
         // Create trigger to prevent updates/deletes (WORM: Write-Once-Read-Many)
         // This enforces append-only behavior at the database level
+        // Exception: Allow hash updates (for initial hash calculation after insert)
         DB::connection('nfts')->statement('
             CREATE OR REPLACE FUNCTION prevent_worm_log_modification()
             RETURNS TRIGGER AS $$
             BEGIN
                 IF TG_OP = \'UPDATE\' THEN
+                    -- Allow hash updates only (for initial hash calculation)
+                    -- Check if only hash field changed and other fields are unchanged
+                    IF (OLD.hash IS NULL OR OLD.hash = \'\') AND NEW.hash IS NOT NULL AND NEW.hash != \'\' THEN
+                        -- Verify other fields haven\'t changed
+                        IF OLD.event_type = NEW.event_type AND
+                           OLD.entity_type = NEW.entity_type AND
+                           OLD.entity_id = NEW.entity_id AND
+                           OLD.payload_json = NEW.payload_json AND
+                           (OLD.prev_hash IS NOT DISTINCT FROM NEW.prev_hash) AND
+                           OLD.created_at = NEW.created_at THEN
+                            RETURN NEW;
+                        END IF;
+                    END IF;
                     RAISE EXCEPTION \'worm_logs table is append-only: updates are not allowed\';
                 END IF;
                 IF TG_OP = \'DELETE\' THEN

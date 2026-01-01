@@ -9,49 +9,51 @@ return new class extends Migration
     public function up(): void
     {
         // Skip if tables already exist
-        if (Schema::hasTable('audit_logs')) {
+        if (Schema::connection('core')->hasTable('audit_logs')) {
             return;
         }
 
-        Schema::create('roles', function (Blueprint $table) {
+        Schema::connection('core')->create('roles', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('description')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('permissions', function (Blueprint $table) {
+        Schema::connection('core')->create('permissions', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('description')->nullable();
             $table->timestamps();
         });
 
-        Schema::create('role_user', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('role_id')->constrained()->cascadeOnDelete();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->timestamps();
-            $table->unique(['role_id', 'user_id']);
+        Schema::connection('core')->create('model_has_roles', function (Blueprint $table) {
+            $table->unsignedBigInteger('role_id');
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->index(['model_id', 'model_type'], 'model_has_roles_model_id_model_type_index');
+            $table->foreign('role_id')->references('id')->on('roles')->onDelete('cascade');
+            $table->primary(['role_id', 'model_id', 'model_type'], 'model_has_roles_role_model_type_primary');
         });
 
-        Schema::create('permission_role', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('role_id')->constrained()->cascadeOnDelete();
-            $table->timestamps();
-            $table->unique(['permission_id', 'role_id']);
+        Schema::connection('core')->create('model_has_permissions', function (Blueprint $table) {
+            $table->unsignedBigInteger('permission_id');
+            $table->string('model_type');
+            $table->unsignedBigInteger('model_id');
+            $table->index(['model_id', 'model_type'], 'model_has_permissions_model_id_model_type_index');
+            $table->foreign('permission_id')->references('id')->on('permissions')->onDelete('cascade');
+            $table->primary(['permission_id', 'model_id', 'model_type'], 'model_has_permissions_permission_model_type_primary');
         });
 
-        Schema::create('permission_user', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('permission_id')->constrained()->cascadeOnDelete();
-            $table->unsignedBigInteger('user_id')->nullable();
-            $table->timestamps();
-            $table->unique(['permission_id', 'user_id']);
+        Schema::connection('core')->create('role_has_permissions', function (Blueprint $table) {
+            $table->unsignedBigInteger('permission_id');
+            $table->unsignedBigInteger('role_id');
+            $table->primary(['permission_id', 'role_id']);
+            $table->foreign('permission_id')->references('id')->on('permissions')->onDelete('cascade');
+            $table->foreign('role_id')->references('id')->on('roles')->onDelete('cascade');
         });
 
-        Schema::create('audit_logs', function (Blueprint $table) {
+        Schema::connection('core')->create('audit_logs', function (Blueprint $table) {
             $table->id();
             $table->string('action', 128);
             $table->string('auditable_type', 255);
@@ -65,12 +67,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('audit_logs');
-        Schema::dropIfExists('permission_user');
-        Schema::dropIfExists('permission_role');
-        Schema::dropIfExists('role_user');
-        Schema::dropIfExists('permissions');
-        Schema::dropIfExists('roles');
+        Schema::connection('core')->dropIfExists('audit_logs');
+        Schema::connection('core')->dropIfExists('role_has_permissions');
+        Schema::connection('core')->dropIfExists('model_has_permissions');
+        Schema::connection('core')->dropIfExists('model_has_roles');
+        Schema::connection('core')->dropIfExists('permissions');
+        Schema::connection('core')->dropIfExists('roles');
     }
 };
 

@@ -8,6 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Idempotent: skip if table already exists
+        if (Schema::connection('products')->hasTable('products')) {
+            return;
+        }
+
         Schema::connection('products')->create('products', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->string('sku')->unique();

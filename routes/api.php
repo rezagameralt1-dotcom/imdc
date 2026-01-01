@@ -53,12 +53,10 @@ Route::prefix('v1')->group(function () {
         Route::post('inventory/{productId}/adjust', [InventoryController::class, 'adjust']);
         Route::post('inventory/reserve', [InventoryController::class, 'reserve']);
 
-        // NFT routes (feature-flagged)
-        if (config('nft.enabled', false)) {
-            Route::post('nfts/mint', [NftController::class, 'mint']);
-            Route::post('nfts/transfer', [NftController::class, 'transfer']);
-            Route::get('nfts/tokens', [NftController::class, 'index']);
-        }
+        // NFT routes (always registered; feature flag handled in controller if needed)
+        Route::post('nfts/mint', [NftController::class, 'mint']);
+        Route::post('nfts/transfer', [NftController::class, 'transfer']);
+        Route::get('nfts/tokens/{token}', [NftController::class, 'show']);
     });
 });
 

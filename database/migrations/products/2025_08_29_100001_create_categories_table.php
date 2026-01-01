@@ -6,7 +6,12 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        Schema::create('categories', function (Blueprint $table) {
+        // Idempotent: skip if table already exists
+        if (Schema::connection('products')->hasTable('categories')) {
+            return;
+        }
+
+        Schema::connection('products')->create('categories', function (Blueprint $table) {
             $table->id();
             $table->string('slug')->unique();
             $table->string('name');
@@ -16,6 +21,6 @@ return new class extends Migration {
         });
     }
     public function down(): void {
-        Schema::dropIfExists('categories');
+        Schema::connection('products')->dropIfExists('categories');
     }
 };

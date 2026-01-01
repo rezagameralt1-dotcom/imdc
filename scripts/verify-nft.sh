@@ -93,6 +93,27 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
+# Guardrail clean mode: Reset nfts database for deterministic testing
+# This ensures WORM chain verification only checks logs from the current run
+GUARDRAIL_CLEAN="${IMDC_GUARDRAIL:-1}"
+if [[ "${GUARDRAIL_CLEAN}" == "1" ]] || [[ "${IMDC_NFT_GUARDRAIL_CLEAN:-0}" == "1" ]]; then
+    echo "Guardrail clean mode: resetting nfts database via migrate:fresh"
+    echo
+    set +e
+    php artisan migrate:fresh --database=nfts --path=database/migrations/nfts --force 2>&1 | grep -E "(DONE|FAIL|ERROR)" || true
+    MIGRATE_EXIT=$?
+    set -e
+    if [[ $MIGRATE_EXIT -ne 0 ]]; then
+        echo "✗ Failed to reset nfts database"
+        exit 1
+    fi
+    echo "✓ NFTs database reset complete"
+    echo
+else
+    echo "Guardrail clean mode: OFF"
+    echo
+fi
+
 # Pre-flight: Wait for Postgres readiness and ensure database exists (self-healing)
 echo "Pre-flight: Ensuring Postgres readiness and nfts database exists..."
 echo
@@ -237,10 +258,43 @@ fi
 echo "    ✓ NFTs migrations complete"
 echo
 
-# Test 1: Mint authentication token
-echo "Test 1: Minting authentication token..."
+# Pre-flight: Verify NFT routes exist
+echo "Pre-flight: Verifying NFT routes are registered..."
 set +e
-TOKEN="$(php artisan imdc:mint-debug-token --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
+ROUTE_CHECK="$(php artisan route:list --path=api/v1/nfts/mint 2>&1)"
+ROUTE_CHECK_EXIT=$?
+set -e
+if [[ $ROUTE_CHECK_EXIT -ne 0 ]] || ! echo "$ROUTE_CHECK" | grep -q "nfts/mint"; then
+    echo "✗ NFT routes are not registered"
+    echo "  Expected route: POST api/v1/nfts/mint"
+    echo "  Route list output:"
+    echo "$ROUTE_CHECK" | head -10
+    echo ""
+    echo "  ERROR: NFT routes must be registered in routes/api.php"
+    echo "  Check that NftController is imported and routes are defined."
+    exit 1
+fi
+echo "    ✓ NFT routes registered"
+echo
+
+# Pre-flight: Verify Sanctum core connection
+echo "Pre-flight: Verifying Sanctum core connection..."
+set +e
+SANCTUM_VERIFY_OUTPUT="$(php artisan imdc:verify-sanctum-core 2>&1)"
+SANCTUM_VERIFY_EXIT=$?
+set -e
+if [[ $SANCTUM_VERIFY_EXIT -ne 0 ]]; then
+    echo "✗ Sanctum core connection verification failed:"
+    echo "$SANCTUM_VERIFY_OUTPUT" | head -20
+    exit 1
+fi
+echo "$SANCTUM_VERIFY_OUTPUT" | grep -E "✓|✗" || true
+echo
+
+# Test 1: Mint authentication token (use admin user)
+echo "Test 1: Minting authentication token for admin user..."
+set +e
+TOKEN="$(php artisan imdc:mint-debug-token --email=admin@imdc.local --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
 TOKEN_EXIT=$?
 set -e
 
@@ -345,7 +399,7 @@ echo
 echo "Test 4: Minting NFT token..."
 CONTRACT="test-contract-$(date +%s)"
 TOKEN_ID="token-$(date +%s)"
-MINT_PAYLOAD="{\"contract\":\"${CONTRACT}\",\"token_id\":\"${TOKEN_ID}\",\"owner_user_id\":\"${USER_ID}\",\"metadata_uri\":\"ipfs://test\"}"
+MINT_PAYLOAD="{\"contract\":\"${CONTRACT}\",\"token_id\":\"${TOKEN_ID}\",\"owner_user_id\":${USER_ID},\"metadata_uri\":\"ipfs://test\"}"
 
 set +e
 MINT_CODE="$(curl_http_code "${API_BASE_URL}/api/v1/nfts/mint" "$TOKEN" "POST" "${MINT_PAYLOAD}")"

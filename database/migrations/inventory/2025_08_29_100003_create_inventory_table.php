@@ -7,9 +7,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        Schema::create('inventories', function (Blueprint $table) {
+        Schema::connection('inventory')->create('inventories', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('product_id')->unique()->constrained('products')->cascadeOnDelete();
+            $table->unsignedBigInteger('product_id')->unique(); // No FK - products table is in products DB
             $table->integer('stock_on_hand')->default(0);
             $table->integer('stock_reserved')->default(0);
             $table->integer('reorder_level')->default(0);
@@ -17,10 +17,10 @@ return new class extends Migration {
         });
 
         // ستون محاسباتی stock_available (Postgres: generated column)
-        DB::statement("ALTER TABLE inventories
+        DB::connection('inventory')->statement("ALTER TABLE inventories
             ADD COLUMN stock_available int GENERATED ALWAYS AS (GREATEST(stock_on_hand - stock_reserved, 0)) STORED");
     }
     public function down(): void {
-        Schema::dropIfExists('inventories');
+        Schema::connection('inventory')->dropIfExists('inventories');
     }
 };

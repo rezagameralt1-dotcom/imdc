@@ -6,9 +6,9 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        Schema::create('orders', function (Blueprint $table) {
+        Schema::connection('orders')->create('orders', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedBigInteger('user_id')->nullable(); // No FK - users table is in core DB
             $table->string('status', 20)->default('pending'); // pending, paid, fulfilled, canceled, refunded
             $table->char('currency', 3)->default('IRR');
             $table->decimal('subtotal', 12, 2)->default(0);
@@ -19,11 +19,11 @@ return new class extends Migration {
             $table->json('meta')->nullable();
             $table->timestamps();
         });
-        Schema::table('orders', function (Blueprint $table) {
+        Schema::connection('orders')->table('orders', function (Blueprint $table) {
             $table->index(['user_id', 'status']);
         });
     }
     public function down(): void {
-        Schema::dropIfExists('orders');
+        Schema::connection('orders')->dropIfExists('orders');
     }
 };

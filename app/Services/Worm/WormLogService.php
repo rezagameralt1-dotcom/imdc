@@ -3,7 +3,9 @@
 namespace App\Services\Worm;
 
 use App\Nfts\Models\WormLog;
+use App\Support\Worm\WormHasher;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class WormLogService
 {
@@ -19,29 +21,55 @@ class WormLogService
     public function log(string $eventType, string $entityType, string $entityId, array $payload): WormLog
     {
         return DB::connection('nfts')->transaction(function () use ($eventType, $entityType, $entityId, $payload) {
-            // Get previous hash (last hash in the chain)
+            // Generate UUID in application BEFORE computing hash
+            $logId = (string) Str::uuid();
+
+            // Get previous hash (last hash in the chain) - must get hash that's already set (not NULL)
             $prevHash = $this->getLastHash();
 
-            // Create canonical JSON from payload (sorted keys for determinism)
-            $canonicalJson = json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS);
+            // Get current timestamp (will be stored as occurred_at/created_at)
+            $occurredAt = now();
 
-            // Create hash: SHA-256(prev_hash + canonical_json + event_type + entity_type + entity_id + created_at)
-            // Note: created_at is set to now() in DB, so we use a placeholder and recalculate after insert
-            $createdAt = now();
-            $hashInput = ($prevHash ?? '') . $canonicalJson . $eventType . $entityType . $entityId . $createdAt->toIso8601String();
-            $hash = hash('sha256', $hashInput);
+            // Extract idempotency_key from payload if present
+            $idempotencyKey = $payload['idempotency_key'] ?? '';
 
-            $log = WormLog::create([
+            // Compute hash using canonical hasher BEFORE insert
+            $hash = WormHasher::compute([
+                'id' => $logId,
+                'prev_hash' => $prevHash ?? '',
+                'action' => $eventType,
+                'entity_type' => $entityType,
+                'entity_id' => $entityId,
+                'payload' => $payload,
+                'idempotency_key' => $idempotencyKey,
+                'occurred_at' => $occurredAt,
+            ]);
+
+            // Insert log with computed hash
+            DB::connection('nfts')->insert("
+                INSERT INTO worm_logs (id, event_type, entity_type, entity_id, payload_json, prev_hash, hash, created_at)
+                VALUES (
+                    :id::uuid,
+                    :event_type,
+                    :entity_type,
+                    :entity_id::uuid,
+                    :payload_json::jsonb,
+                    :prev_hash,
+                    :hash,
+                    :created_at
+                )
+            ", [
+                'id' => $logId,
                 'event_type' => $eventType,
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
-                'payload_json' => $payload,
+                'payload_json' => json_encode($payload),
                 'prev_hash' => $prevHash,
                 'hash' => $hash,
-                'created_at' => $createdAt,
+                'created_at' => $occurredAt,
             ]);
 
-            return $log;
+            return WormLog::findOrFail($logId);
         });
     }
 
@@ -50,7 +78,10 @@ class WormLogService
      */
     private function getLastHash(): ?string
     {
-        $lastLog = WormLog::orderBy('created_at', 'desc')
+        // Get the last log that has a hash set (not NULL) - this ensures we get the correct prev_hash
+        $lastLog = WormLog::whereNotNull('hash')
+            ->where('hash', '!=', '')
+            ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc')
             ->first();
 
@@ -72,10 +103,23 @@ class WormLogService
         $prevHash = null;
 
         foreach ($logs as $log) {
-            // Recalculate hash
-            $canonicalJson = json_encode($log->payload_json, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_SORT_KEYS);
-            $hashInput = ($prevHash ?? '') . $canonicalJson . $log->event_type . $log->entity_type . $log->entity_id . $log->created_at->toIso8601String();
-            $expectedHash = hash('sha256', $hashInput);
+            // Extract idempotency_key from payload if present
+            $idempotencyKey = '';
+            if (is_array($log->payload_json) && isset($log->payload_json['idempotency_key'])) {
+                $idempotencyKey = $log->payload_json['idempotency_key'];
+            }
+
+            // Recompute hash using the same canonical hasher
+            $expectedHash = WormHasher::compute([
+                'id' => $log->id,
+                'prev_hash' => $prevHash ?? '',
+                'action' => $log->event_type,
+                'entity_type' => $log->entity_type,
+                'entity_id' => $log->entity_id,
+                'payload' => $log->payload_json,
+                'idempotency_key' => $idempotencyKey,
+                'occurred_at' => $log->created_at,
+            ]);
 
             if ($log->hash !== $expectedHash) {
                 $errors[] = "Hash mismatch for log {$log->id}: expected {$expectedHash}, got {$log->hash}";

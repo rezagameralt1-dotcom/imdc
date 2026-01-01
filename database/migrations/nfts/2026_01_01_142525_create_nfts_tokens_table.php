@@ -15,7 +15,7 @@ return new class extends Migration
             $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
             $table->string('contract');
             $table->string('token_id');
-            $table->uuid('owner_user_id');
+            $table->unsignedBigInteger('owner_user_id'); // No FK - users table is in core DB
             $table->string('metadata_uri')->nullable();
             $table->enum('status', ['minted', 'transferred', 'burned'])->default('minted');
             $table->timestamps();
