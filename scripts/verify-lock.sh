@@ -180,6 +180,29 @@ else
 fi
 echo
 
+# Check 4: DID guardrail (always runs; verify-did.sh handles temporary enablement)
+echo "Check 4: DID guardrail must PASS..."
+if [[ -f "$SCRIPT_DIR/verify-did.sh" ]]; then
+    DID_EXIT=0
+    docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && IMDC_API_BASE_URL=http://web:80 ./scripts/verify-did.sh --in-container" > /tmp/did_guardrail_output.txt 2>&1 || DID_EXIT=$?
+    
+    if [[ $DID_EXIT -eq 0 ]]; then
+        if grep -q "DID Guardrail PASSED" /tmp/did_guardrail_output.txt; then
+            echo "✓ DID guardrail PASSED"
+        else
+            echo "✗ DID guardrail did not report PASS"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ DID guardrail execution failed (exit code: $DID_EXIT)"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "✗ verify-did.sh not found"
+    ERRORS=$((ERRORS + 1))
+fi
+echo
+
 # Summary
 if [[ $ERRORS -eq 0 ]]; then
     echo "=== All checks PASSED ==="
