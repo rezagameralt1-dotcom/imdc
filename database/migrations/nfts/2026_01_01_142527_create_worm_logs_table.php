@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('entity_type');
             $table->uuid('entity_id');
             $table->jsonb('payload_json');
-            $table->string('prev_hash')->nullable();
+            $table->string('prev_hash')->default('');
             $table->string('hash')->nullable(); // Allow NULL initially, will be set after insert
             $table->timestamp('created_at');
 

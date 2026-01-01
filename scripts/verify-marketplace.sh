@@ -320,7 +320,7 @@ echo "  [2/4] Products..."
 PRODUCTS_MIGRATE_OUTPUT=""
 PRODUCTS_MIGRATE_EXIT=0
 set +e
-PRODUCTS_MIGRATE_OUTPUT="$(php artisan migrate -n --database=products --path=database/migrations/products 2>&1)"
+PRODUCTS_MIGRATE_OUTPUT="$(php artisan migrate --force --database=products --path=database/migrations/products 2>&1)"
 PRODUCTS_MIGRATE_EXIT=$?
 set -e
 if [[ $PRODUCTS_MIGRATE_EXIT -ne 0 ]]; then
@@ -336,7 +336,7 @@ echo "  [3/4] Orders..."
 ORDERS_MIGRATE_OUTPUT=""
 ORDERS_MIGRATE_EXIT=0
 set +e
-ORDERS_MIGRATE_OUTPUT="$(php artisan migrate -n --database=orders --path=database/migrations/orders 2>&1)"
+ORDERS_MIGRATE_OUTPUT="$(php artisan migrate --force --database=orders --path=database/migrations/orders 2>&1)"
 ORDERS_MIGRATE_EXIT=$?
 set -e
 if [[ $ORDERS_MIGRATE_EXIT -ne 0 ]]; then
@@ -353,7 +353,7 @@ if [[ -d "database/migrations/inventory" ]]; then
     INVENTORY_MIGRATE_OUTPUT=""
     INVENTORY_MIGRATE_EXIT=0
     set +e
-    INVENTORY_MIGRATE_OUTPUT="$(php artisan migrate -n --database=inventory --path=database/migrations/inventory 2>&1)"
+    INVENTORY_MIGRATE_OUTPUT="$(php artisan migrate --force --database=inventory --path=database/migrations/inventory 2>&1)"
     INVENTORY_MIGRATE_EXIT=$?
     set -e
     if [[ $INVENTORY_MIGRATE_EXIT -ne 0 ]]; then

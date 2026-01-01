@@ -2,108 +2,191 @@
 
 namespace App\Support\Worm;
 
+/**
+ * Canonical WORM Hash Specification (LOCKED)
+ * 
+ * This class implements the deterministic, immutable canonical hashing for WORM logs.
+ * Both writer and verifier MUST use this exact specification.
+ * 
+ * CANONICAL HASH INPUT SPECIFICATION:
+ * 1. Field order (EXACT, matching DB columns):
+ *    - id
+ *    - prev_hash
+ *    - event_type
+ *    - entity_type
+ *    - entity_id
+ *    - payload_json (canonical JSON string)
+ *    - created_at (UTC seconds string: "Y-m-d H:i:s")
+ * 
+ * 2. JSON Canonicalization Rules:
+ *    - Associative arrays (objects): sort keys recursively (ksort)
+ *    - List arrays: preserve order, canonicalize elements recursively
+ *    - Scalars: preserve types (numbers stay numeric)
+ *    - Encoding flags: JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
+ *    - NO JSON_SORT_KEYS at top-level (order enforced by insertion)
+ * 
+ * 3. Timestamp Canonicalization:
+ *    - Format: "Y-m-d H:i:s" (UTC, seconds precision only)
+ *    - Microseconds are TRUNCATED (not rounded)
+ *    - Empty/invalid input => empty string
+ * 
+ * 4. Hash Algorithm: SHA-256 (hex output)
+ */
 class WormHasher
 {
     /**
      * Compute canonical hash for a WORM log entry.
      * 
-     * This function ensures deterministic hashing by:
-     * 1. Using a strict field order
-     * 2. Canonicalizing JSON payload (sorted keys, consistent encoding)
-     * 3. Using ISO8601 UTC timestamps
-     * 4. Joining fields with a delimiter
+     * This is the SINGLE SOURCE OF TRUTH for WORM hash computation.
+     * Both writer and verifier MUST use this method with identical inputs.
      * 
-     * @param array $fields Fields in order: id, prev_hash, action, entity_type, entity_id, payload, idempotency_key, occurred_at
+     * @param array $fields Fields matching DB columns: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
      * @return string SHA-256 hex hash
      */
     public static function compute(array $fields): string
     {
-        // Extract fields with defaults
+        // Extract fields matching DB columns: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
         $id = $fields['id'] ?? '';
         $prevHash = $fields['prev_hash'] ?? '';
-        $action = $fields['action'] ?? $fields['event_type'] ?? '';
+        $eventType = $fields['event_type'] ?? $fields['action'] ?? '';
         $entityType = $fields['entity_type'] ?? '';
         $entityId = $fields['entity_id'] ?? '';
-        $payload = $fields['payload'] ?? $fields['payload_json'] ?? [];
-        $idempotencyKey = $fields['idempotency_key'] ?? '';
+        $payload = $fields['payload_json'] ?? $fields['payload'] ?? [];
         $occurredAt = $fields['occurred_at'] ?? $fields['created_at'] ?? '';
 
-        // Canonicalize payload: recursively sort keys and encode with consistent flags
-        $canonicalPayload = self::canonicalizePayload($payload);
+        // Canonicalize payload_json: returns canonical JSON string
+        // Rules: sort keys for objects, preserve order for arrays, recursive
+        $canonicalPayloadJson = self::canonicalizePayload($payload);
 
-        // Normalize occurred_at to ISO8601 UTC format
-        $occurredAtIso = self::normalizeTimestamp($occurredAt);
+        // Normalize created_at to UTC seconds string: "Y-m-d H:i:s" (truncate microseconds)
+        $createdAtNormalized = self::normalizeTimestamp($occurredAt);
 
-        // Build hash input string with strict field order and delimiter
-        // Order: id, prev_hash, action, entity_type, entity_id, payload, idempotency_key, occurred_at
-        $hashInput = implode("\n", [
-            (string) $id,
-            (string) $prevHash,
-            (string) $action,
-            (string) $entityType,
-            (string) $entityId,
-            $canonicalPayload,
-            (string) $idempotencyKey,
-            $occurredAtIso,
-        ]);
+        // Build canonical JSON object with fields in EXACT order (matching DB columns):
+        // id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
+        // Note: PHP 7.2+ preserves insertion order in JSON objects
+        $canonicalObject = [
+            'id' => (string) $id,
+            'prev_hash' => (string) $prevHash,
+            'event_type' => (string) $eventType,
+            'entity_type' => (string) $entityType,
+            'entity_id' => (string) $entityId,
+            'payload_json' => $canonicalPayloadJson, // Canonical JSON string (not object)
+            'created_at' => $createdAtNormalized,
+        ];
+
+        // Encode to canonical JSON string (no whitespace, preserves insertion order in PHP 7.2+)
+        // JSON_PRESERVE_ZERO_FRACTION = 1024
+        // Do NOT use JSON_SORT_KEYS (64) on top-level to preserve exact field order
+        $canonicalJson = json_encode($canonicalObject, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | 1024);
 
         // Compute SHA-256 hash
-        return hash('sha256', $hashInput);
+        return hash('sha256', $canonicalJson);
     }
 
     /**
-     * Canonicalize payload array to JSON string with sorted keys.
+     * Canonicalize payload_json according to locked specification.
      * 
-     * @param mixed $payload
-     * @return string JSON string
+     * CANONICALIZATION RULES:
+     * - Associative arrays (objects): sort keys recursively (ksort)
+     * - List arrays: preserve order, canonicalize elements recursively
+     * - Scalars: preserve types (numbers stay numeric)
+     * - Encoding: JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
+     * 
+     * @param mixed $payload Can be array, JSON string, or null
+     * @return string Canonical JSON string
      */
-    private static function canonicalizePayload($payload): string
+    public static function canonicalizePayload($payload): string
     {
         if (is_string($payload)) {
-            // If already JSON string, decode and re-encode to ensure canonicalization
+            // If already JSON string, decode to PHP value
             $decoded = json_decode($payload, true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 $payload = $decoded;
             } else {
-                // Invalid JSON, return as-is (shouldn't happen in normal flow)
-                return $payload;
+                // Invalid JSON, return empty object JSON
+                return '{}';
             }
+        }
+
+        if ($payload === null) {
+            return 'null';
         }
 
         if (!is_array($payload)) {
-            $payload = [];
+            // Scalar value: encode directly (preserves type)
+            return json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | 1024);
         }
 
-        // Recursively sort keys
-        $canonical = self::recursiveKsort($payload);
+        // Canonicalize array: sort keys for objects, preserve order for lists
+        $canonical = self::canonicalizeValue($payload);
 
-        // Encode with consistent flags: no unicode escaping, no slash escaping, sorted keys
-        // JSON_SORT_KEYS = 64 (PHP constant, use numeric value for compatibility)
-        return json_encode($canonical, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | 64);
+        // Encode back using canonical flags
+        // JSON_PRESERVE_ZERO_FRACTION = 1024
+        // Do NOT use JSON_SORT_KEYS (64) - we handle sorting structurally
+        return json_encode($canonical, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | 1024);
     }
 
     /**
-     * Recursively sort array keys.
+     * Recursively canonicalize a value according to locked specification.
      * 
-     * @param array $array
-     * @return array
+     * - Associative arrays (objects): sort keys (ksort), canonicalize values
+     * - List arrays: preserve order, canonicalize each element
+     * - Scalars: return as-is
+     * 
+     * @param mixed $value
+     * @return mixed Canonicalized value
      */
-    private static function recursiveKsort(array $array): array
+    private static function canonicalizeValue($value)
     {
-        ksort($array);
-        foreach ($array as $key => $value) {
-            if (is_array($value)) {
-                $array[$key] = self::recursiveKsort($value);
+        if (!is_array($value)) {
+            return $value;
+        }
+
+        // Check if array is associative (object) or list (array)
+        $isAssoc = self::isAssociativeArray($value);
+
+        if ($isAssoc) {
+            // Associative array (object): sort keys, canonicalize values
+            ksort($value);
+            foreach ($value as $key => $val) {
+                $value[$key] = self::canonicalizeValue($val);
+            }
+        } else {
+            // List array: preserve order, canonicalize elements
+            foreach ($value as $key => $val) {
+                $value[$key] = self::canonicalizeValue($val);
             }
         }
-        return $array;
+
+        return $value;
     }
 
     /**
-     * Normalize timestamp to ISO8601 UTC format.
+     * Check if array is associative (object) or list (array).
      * 
-     * @param mixed $timestamp Can be Carbon instance, DateTime, string, or ISO8601 string
-     * @return string ISO8601 format: YYYY-MM-DDTHH:MM:SS+00:00
+     * @param array $array
+     * @return bool true if associative, false if list
+     */
+    private static function isAssociativeArray(array $array): bool
+    {
+        if (empty($array)) {
+            return false; // Empty array treated as list
+        }
+
+        // Check if keys are sequential starting from 0
+        return array_keys($array) !== range(0, count($array) - 1);
+    }
+
+    /**
+     * Normalize timestamp to UTC seconds string format (LOCKED SPEC).
+     * 
+     * CANONICALIZATION RULES:
+     * - Format: "Y-m-d H:i:s" (UTC, seconds precision only)
+     * - Microseconds are TRUNCATED (not rounded)
+     * - Empty/invalid input => empty string
+     * 
+     * @param mixed $timestamp Can be Carbon instance, DateTime, or string
+     * @return string Format: "Y-m-d H:i:s" (UTC, no timezone suffix, no microseconds)
      */
     private static function normalizeTimestamp($timestamp): string
     {
@@ -111,41 +194,38 @@ class WormHasher
             return '';
         }
 
-        // If already ISO8601 string, validate and return
-        if (is_string($timestamp)) {
-            // Check if it's already in ISO8601 format
-            if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+\-]\d{2}:\d{2}$/', $timestamp)) {
-                // Ensure UTC timezone
-                if (strpos($timestamp, '+00:00') !== false || strpos($timestamp, 'Z') !== false) {
-                    return str_replace('Z', '+00:00', $timestamp);
-                }
-                // Parse and convert to UTC
-                try {
-                    $dt = new \DateTime($timestamp);
-                    $dt->setTimezone(new \DateTimeZone('UTC'));
-                    return $dt->format('Y-m-d\TH:i:s+00:00');
-                } catch (\Exception $e) {
-                    return $timestamp;
-                }
-            }
-        }
-
-        // Try to parse as Carbon/DateTime
         try {
+            $dt = null;
+
             if ($timestamp instanceof \Carbon\Carbon) {
-                return $timestamp->setTimezone('UTC')->format('Y-m-d\TH:i:s+00:00');
-            }
-            if ($timestamp instanceof \DateTime) {
+                $dt = $timestamp->copy()->setTimezone('UTC');
+            } elseif ($timestamp instanceof \DateTime) {
                 $dt = clone $timestamp;
                 $dt->setTimezone(new \DateTimeZone('UTC'));
-                return $dt->format('Y-m-d\TH:i:s+00:00');
+            } elseif (is_string($timestamp)) {
+                // If already in 'Y-m-d H:i:s' format (no microseconds), assume UTC
+                if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $timestamp)) {
+                    return $timestamp;
+                }
+                // If contains microseconds, truncate (not round)
+                if (preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(\.\d+)?/', $timestamp, $matches)) {
+                    return $matches[1]; // Return seconds part only (truncate microseconds)
+                }
+                // Parse and convert to UTC
+                $dt = new \DateTime($timestamp);
+                $dt->setTimezone(new \DateTimeZone('UTC'));
+            } else {
+                return '';
             }
-            // Try to parse string
-            $dt = new \DateTime($timestamp);
-            $dt->setTimezone(new \DateTimeZone('UTC'));
-            return $dt->format('Y-m-d\TH:i:s+00:00');
+
+            if ($dt) {
+                // Format to seconds precision (truncates microseconds)
+                return $dt->format('Y-m-d H:i:s');
+            }
+
+            return '';
         } catch (\Exception $e) {
-            return (string) $timestamp;
+            return '';
         }
     }
 }

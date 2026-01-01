@@ -247,7 +247,7 @@ echo
 echo "Pre-flight: Running nfts migrations..."
 echo
 set +e
-NFTS_MIGRATE_OUTPUT="$(php artisan migrate -n --database=nfts --path=database/migrations/nfts 2>&1)"
+NFTS_MIGRATE_OUTPUT="$(php artisan migrate --force --database=nfts --path=database/migrations/nfts 2>&1)"
 NFTS_MIGRATE_EXIT=$?
 set -e
 if [[ $NFTS_MIGRATE_EXIT -ne 0 ]]; then
@@ -502,29 +502,33 @@ fi
 
 echo "✓ WORM logs found: ${WORM_LOGS_COUNT}"
 
-# Verify hash chain integrity
+# Verify hash chain integrity using the same verifier as application code
+# This calls WormLogService::verifyChain() which uses WormHasher::compute()
+# and sorts logs by created_at ASC, id ASC (matching application logic)
 set +e
-WORM_VERIFY="$(php artisan tinker --execute="
-try {
-    \$service = new \App\Services\Worm\WormLogService();
-    \$result = \$service->verifyChain();
-    if (\$result['valid']) {
-        echo 'valid';
-    } else {
-        echo 'invalid: ' . implode(', ', \$result['errors']);
-    }
-} catch (Exception \$e) {
-    echo 'failed: ' . \$e->getMessage();
-}
-" 2>/dev/null | tail -1)"
+WORM_VERIFY_OUTPUT="$(php artisan imdc:verify-worm 2>&1)"
+WORM_VERIFY_EXIT=$?
 set -e
 
-if [[ "$WORM_VERIFY" != "valid" ]]; then
-    echo "✗ WORM chain verification failed: ${WORM_VERIFY}"
+if [[ $WORM_VERIFY_EXIT -ne 0 ]]; then
+    echo "✗ WORM chain verification failed:"
+    echo "$WORM_VERIFY_OUTPUT"
     exit 1
 fi
 
-echo "✓ WORM chain integrity verified"
+# Check output for success message
+if echo "$WORM_VERIFY_OUTPUT" | grep -q "✓ WORM chain integrity verified"; then
+    echo "✓ WORM chain integrity verified"
+else
+    # If command succeeded but output doesn't match expected, still check exit code
+    if [[ $WORM_VERIFY_EXIT -eq 0 ]]; then
+        echo "✓ WORM chain integrity verified"
+    else
+        echo "✗ WORM chain verification failed:"
+        echo "$WORM_VERIFY_OUTPUT"
+        exit 1
+    fi
+fi
 echo
 
 echo "=== NFT Guardrail PASSED ==="

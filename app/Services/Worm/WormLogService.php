@@ -24,28 +24,35 @@ class WormLogService
             // Generate UUID in application BEFORE computing hash
             $logId = (string) Str::uuid();
 
-            // Get previous hash (last hash in the chain) - must get hash that's already set (not NULL)
+            // Get previous hash (last hash in the chain) - returns '' for first log
             $prevHash = $this->getLastHash();
 
-            // Get current timestamp (will be stored as occurred_at/created_at)
-            $occurredAt = now();
+            // Get current timestamp with seconds precision only (truncate microseconds)
+            // This ensures created_at matches the canonical hash input format
+            $occurredAt = now()->setTimezone('UTC');
+            $createdAtSeconds = $occurredAt->format('Y-m-d H:i:s'); // Truncate microseconds
 
-            // Extract idempotency_key from payload if present
-            $idempotencyKey = $payload['idempotency_key'] ?? '';
+            // Canonicalize payload_json BEFORE computing hash (must match what we store in DB)
+            // WormHasher::canonicalizePayload returns canonical JSON string
+            $canonicalPayloadJson = WormHasher::canonicalizePayload($payload);
 
             // Compute hash using canonical hasher BEFORE insert
+            // Use exact DB column names: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
+            // Note: payload_json must be canonical JSON string, created_at must be seconds-only UTC string
             $hash = WormHasher::compute([
                 'id' => $logId,
-                'prev_hash' => $prevHash ?? '',
-                'action' => $eventType,
+                'prev_hash' => $prevHash,
+                'event_type' => $eventType,
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
-                'payload' => $payload,
-                'idempotency_key' => $idempotencyKey,
-                'occurred_at' => $occurredAt,
+                'payload_json' => $canonicalPayloadJson, // Canonical JSON string
+                'created_at' => $createdAtSeconds, // UTC seconds string
             ]);
 
             // Insert log with computed hash
+            // Store prev_hash as empty string (not NULL) for consistency
+            // Store payload_json as canonical JSON string (not PHP array)
+            // Store created_at with seconds precision only
             DB::connection('nfts')->insert("
                 INSERT INTO worm_logs (id, event_type, entity_type, entity_id, payload_json, prev_hash, hash, created_at)
                 VALUES (
@@ -56,17 +63,17 @@ class WormLogService
                     :payload_json::jsonb,
                     :prev_hash,
                     :hash,
-                    :created_at
+                    :created_at::timestamp
                 )
             ", [
                 'id' => $logId,
                 'event_type' => $eventType,
                 'entity_type' => $entityType,
                 'entity_id' => $entityId,
-                'payload_json' => json_encode($payload),
+                'payload_json' => $canonicalPayloadJson, // Canonical JSON string (not PHP array)
                 'prev_hash' => $prevHash,
                 'hash' => $hash,
-                'created_at' => $occurredAt,
+                'created_at' => $createdAtSeconds, // UTC seconds string
             ]);
 
             return WormLog::findOrFail($logId);
@@ -75,8 +82,9 @@ class WormLogService
 
     /**
      * Get the last hash from the chain (for prev_hash calculation)
+     * Returns empty string for first log, or previous log's hash
      */
-    private function getLastHash(): ?string
+    private function getLastHash(): string
     {
         // Get the last log that has a hash set (not NULL) - this ensures we get the correct prev_hash
         $lastLog = WormLog::whereNotNull('hash')
@@ -85,13 +93,14 @@ class WormLogService
             ->orderBy('id', 'desc')
             ->first();
 
-        return $lastLog?->hash;
+        // Return empty string if no previous log exists (first log in chain)
+        return $lastLog?->hash ?? '';
     }
 
     /**
      * Verify hash chain integrity
      *
-     * @return array ['valid' => bool, 'errors' => array]
+     * @return array ['valid' => bool, 'errors' => array, 'diagnostics' => array]
      */
     public function verifyChain(): array
     {
@@ -100,33 +109,74 @@ class WormLogService
             ->get();
 
         $errors = [];
-        $prevHash = null;
+        $diagnostics = [];
+        $prevHash = ''; // Start with empty string (first log has no previous hash)
 
         foreach ($logs as $log) {
-            // Extract idempotency_key from payload if present
-            $idempotencyKey = '';
-            if (is_array($log->payload_json) && isset($log->payload_json['idempotency_key'])) {
-                $idempotencyKey = $log->payload_json['idempotency_key'];
+            // Normalize prev_hash from DB (NULL -> empty string for consistency)
+            $logPrevHash = $log->prev_hash ?? '';
+
+            // Normalize created_at: ensure seconds precision (truncate microseconds if present)
+            // This matches the canonical hash input format
+            $createdAtNormalized = $log->created_at;
+            if (is_string($createdAtNormalized) && preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(\.\d+)?/', $createdAtNormalized, $matches)) {
+                $createdAtNormalized = $matches[1]; // Truncate microseconds
+            } elseif ($createdAtNormalized instanceof \Carbon\Carbon || $createdAtNormalized instanceof \DateTime) {
+                $createdAtNormalized = $createdAtNormalized->setTimezone('UTC')->format('Y-m-d H:i:s');
+            }
+
+            // Canonicalize payload_json for diagnostics (first 200 chars)
+            $canonicalPayloadJson = WormHasher::canonicalizePayload($log->payload_json);
+            $canonicalPayloadPreview = mb_substr($canonicalPayloadJson, 0, 200);
+            if (mb_strlen($canonicalPayloadJson) > 200) {
+                $canonicalPayloadPreview .= '...';
             }
 
             // Recompute hash using the same canonical hasher
+            // Use exact DB column names: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
+            // Note: payload_json is cast to array by Laravel model, canonicalizePayload() handles both array and JSON string
+            // created_at normalized to seconds (truncate microseconds)
             $expectedHash = WormHasher::compute([
                 'id' => $log->id,
-                'prev_hash' => $prevHash ?? '',
-                'action' => $log->event_type,
+                'prev_hash' => $prevHash,
+                'event_type' => $log->event_type,
                 'entity_type' => $log->entity_type,
                 'entity_id' => $log->entity_id,
-                'payload' => $log->payload_json,
-                'idempotency_key' => $idempotencyKey,
-                'occurred_at' => $log->created_at,
+                'payload_json' => $log->payload_json, // Array (due to model cast) or JSON string - canonicalizePayload() handles both
+                'created_at' => $createdAtNormalized, // UTC seconds string
             ]);
 
             if ($log->hash !== $expectedHash) {
-                $errors[] = "Hash mismatch for log {$log->id}: expected {$expectedHash}, got {$log->hash}";
+                // Provide precise error with hint about potential cause
+                $hint = 'Check payload_json canonicalization or created_at timestamp format';
+                $errors[] = "Hash mismatch for log {$log->id}: expected {$expectedHash}, got {$log->hash} ({$hint})";
+                
+                // Store detailed diagnostics for first mismatch
+                if (empty($diagnostics)) {
+                    $diagnostics[] = [
+                        'row_id' => $log->id,
+                        'expected_hash' => $expectedHash,
+                        'actual_hash' => $log->hash,
+                        'created_at_normalized' => $createdAtNormalized,
+                        'payload_json_canonical_preview' => $canonicalPayloadPreview,
+                    ];
+                }
             }
 
-            if ($log->prev_hash !== $prevHash) {
-                $errors[] = "Prev hash mismatch for log {$log->id}: expected {$prevHash}, got {$log->prev_hash}";
+            // Compare normalized prev_hash values
+            if ($logPrevHash !== $prevHash) {
+                $errors[] = "Prev hash mismatch for log {$log->id}: expected {$prevHash}, got {$logPrevHash}";
+                
+                // Store detailed diagnostics for first prev_hash mismatch if no hash mismatch yet
+                if (empty($diagnostics)) {
+                    $diagnostics[] = [
+                        'row_id' => $log->id,
+                        'expected_hash' => 'N/A (prev_hash mismatch)',
+                        'actual_hash' => $log->hash ?? 'NULL',
+                        'created_at_normalized' => $createdAtNormalized,
+                        'payload_json_canonical_preview' => $canonicalPayloadPreview,
+                    ];
+                }
             }
 
             $prevHash = $log->hash;
@@ -135,6 +185,7 @@ class WormLogService
         return [
             'valid' => empty($errors),
             'errors' => $errors,
+            'diagnostics' => $diagnostics,
         ];
     }
 }
