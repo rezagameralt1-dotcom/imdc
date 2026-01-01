@@ -93,6 +93,52 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
+# Pre-flight: Ensure database exists (self-healing)
+echo "Pre-flight: Ensuring nfts database exists..."
+echo
+
+# Get database connection details from environment or config defaults
+DB_HOST="${DB_NFTS_HOST:-${DB_HOST:-db}}"
+DB_PORT="${DB_NFTS_PORT:-${DB_PORT:-5432}}"
+DB_USER="${DB_NFTS_USERNAME:-${DB_USERNAME:-imdc}}"
+DB_PASS="${DB_NFTS_PASSWORD:-${DB_PASSWORD:-imdc}}"
+DB_NAME="imdc_nfts"
+
+# Check if database exists and create if needed (idempotent)
+# Use PHP to create database if psql is not available (works in all contexts)
+set +e
+DB_CHECK_OUTPUT="$(php artisan tinker --execute="
+try {
+    \$conn = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}');
+    \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\");
+    \$exists = \$stmt->fetch() !== false;
+    if (!\$exists) {
+        \$conn->exec(\"CREATE DATABASE ${DB_NAME}\");
+        echo 'created';
+    } else {
+        echo 'exists';
+    }
+} catch (Exception \$e) {
+    echo 'error: ' . \$e->getMessage();
+    exit(1);
+}
+" 2>&1)"
+DB_CHECK_EXIT=$?
+set -e
+
+if [[ $DB_CHECK_EXIT -eq 0 ]]; then
+    if echo "$DB_CHECK_OUTPUT" | grep -q "created"; then
+        echo "  ✓ Database $DB_NAME created"
+    elif echo "$DB_CHECK_OUTPUT" | grep -q "exists"; then
+        echo "  ✓ Database $DB_NAME already exists"
+    else
+        echo "  ⚠ Database check output: $DB_CHECK_OUTPUT"
+    fi
+else
+    echo "  ⚠ Could not verify/create database (may already exist): $DB_CHECK_OUTPUT"
+fi
+echo
+
 # Pre-flight: Run nfts migrations
 echo "Pre-flight: Running nfts migrations..."
 echo
@@ -103,15 +149,6 @@ set -e
 if [[ $NFTS_MIGRATE_EXIT -ne 0 ]]; then
     echo "✗ NFTs migration failed:"
     echo "$NFTS_MIGRATE_OUTPUT" | head -20
-    if echo "$NFTS_MIGRATE_OUTPUT" | grep -q "does not exist"; then
-        echo ""
-        echo "ERROR: Database 'imdc_nfts' does not exist."
-        echo "Please ensure the database is created. For docker-compose setup,"
-        echo "the postgres-init script should create it automatically on container start."
-        echo "If the container already exists, you may need to recreate it:"
-        echo "  docker compose -f infra/docker/docker-compose.yml down -v"
-        echo "  docker compose -f infra/docker/docker-compose.yml up -d db"
-    fi
     exit 1
 fi
 echo "    ✓ NFTs migrations complete"
