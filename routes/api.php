@@ -21,22 +21,7 @@ Route::prefix('v1')->group(function () {
         });
 
         // User info endpoint
-        if (class_exists(\App\Http\Controllers\Api\MeController::class)) {
-            Route::get('me', [\App\Http\Controllers\Api\MeController::class]);
-        } elseif (class_exists(\App\Http\Controllers\MeController::class)) {
-            Route::get('me', [\App\Http\Controllers\MeController::class]);
-        } else {
-            Route::get('me', function () {
-                return response()->json([
-                    'success' => false,
-                    'error' => [
-                        'code' => 'ME_CONTROLLER_MISSING',
-                        'message' => 'MeController not installed'
-                    ],
-                    'trace_id' => 'local'
-                ], 501);
-            });
-        }
+        Route::get('me', \App\Http\Controllers\Api\MeController::class);
         Route::get('auth/me', [AuthController::class, 'me']); // Keep for backward compatibility
         
         // RBAC-protected health endpoints
@@ -80,22 +65,7 @@ Route::middleware(['auth:sanctum'])->prefix('market')->group(function () {
 
 // RBAC smoke-test endpoints (without /v1 prefix)
 Route::middleware('auth:sanctum')->group(function () {
-    if (class_exists(\App\Http\Controllers\Api\MeController::class)) {
-        Route::get('/me', \App\Http\Controllers\Api\MeController::class);
-    } elseif (class_exists(\App\Http\Controllers\MeController::class)) {
-        Route::get('/me', \App\Http\Controllers\MeController::class);
-    } else {
-        Route::get('/me', function () {
-            return response()->json([
-                'success' => false,
-                'error' => [
-                    'code' => 'ME_CONTROLLER_MISSING',
-                    'message' => 'MeController not installed'
-                ],
-                'trace_id' => 'local'
-            ], 501);
-        });
-    }
+    Route::get('/me', \App\Http\Controllers\Api\MeController::class);
     // Admin ping: requires Admin role only (LOCKED - stable baseline)
     if (class_exists(\App\Http\Controllers\Api\AdminPingController::class)) {
         Route::get('/admin/ping', \App\Http\Controllers\Api\AdminPingController::class)
