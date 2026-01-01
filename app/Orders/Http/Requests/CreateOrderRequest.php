@@ -11,7 +11,6 @@ class CreateOrderRequest extends BaseApiRequest
         return [
             'currency' => ['sometimes', 'string', 'size:3'],
             'meta' => ['nullable', 'array'],
-            'idempotency_key' => ['nullable', 'string', 'max:255'],
             'items' => ['required', 'array', 'min:1'],
             'items.*.product_id' => ['required', 'uuid'],
             'items.*.quantity' => ['required', 'integer', 'min:1'],

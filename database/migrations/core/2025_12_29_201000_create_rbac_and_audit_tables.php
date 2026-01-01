@@ -8,8 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Skip if tables already exist
-        if (Schema::hasTable('audit_logs')) {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
             return;
         }
 
@@ -65,6 +64,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
+            return;
+        }
+
         Schema::dropIfExists('audit_logs');
         Schema::dropIfExists('permission_user');
         Schema::dropIfExists('permission_role');

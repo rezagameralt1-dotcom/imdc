@@ -11,13 +11,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Ensure we're on the core connection (pgsql driver)
-        $connection = Schema::getConnection();
-        if ($connection->getDriverName() !== 'pgsql') {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
             return;
         }
 
-        Schema::connection('core')->create('personal_access_tokens', function (Blueprint $table) {
+        Schema::create('personal_access_tokens', function (Blueprint $table) {
             $table->id();
             $table->morphs('tokenable');
             $table->text('name');
@@ -34,11 +32,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        $connection = Schema::getConnection();
-        if ($connection->getDriverName() !== 'pgsql') {
+        if (Schema::getConnection()->getName() !== 'pgsql') {
             return;
         }
 
-        Schema::connection('core')->dropIfExists('personal_access_tokens');
+        Schema::dropIfExists('personal_access_tokens');
     }
 };

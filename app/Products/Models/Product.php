@@ -27,7 +27,6 @@ class Product extends Model
         'currency',
         'status',
         'metadata',
-        'seller_id',
     ];
 
     protected $casts = [

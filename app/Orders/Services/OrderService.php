@@ -2,7 +2,6 @@
 
 namespace App\Orders\Services;
 
-use App\Core\Services\AccountingService;
 use App\Inventory\Services\InventoryService;
 use App\Orders\Models\Order;
 use App\Orders\Models\OrderItem;
@@ -18,45 +17,14 @@ class OrderService
         private readonly InventoryService $inventoryService,
         private readonly RedisStreamPublisher $publisher,
         private readonly AuditLogger $auditLogger,
-        private readonly AccountingService $accountingService,
     ) {
     }
 
-    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): array
+    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): Order
     {
         $itemsInput = $payload['items'] ?? [];
         if (empty($itemsInput)) {
             throw ValidationException::withMessages(['items' => 'At least one item is required.']);
-        }
-
-        // Idempotency check: if idempotency_key provided, validate or return existing order
-        $idempotencyKey = $payload['idempotency_key'] ?? null;
-        if ($idempotencyKey) {
-            $existingOrder = Order::where('idempotency_key', $idempotencyKey)->first();
-            if ($existingOrder) {
-                // Verify payload matches existing order
-                $existingItems = $existingOrder->items->map(fn($item) => [
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                ])->toArray();
-                $newItems = collect($itemsInput)->map(fn($item) => [
-                    'product_id' => $item['product_id'],
-                    'quantity' => (int) $item['quantity'],
-                ])->toArray();
-                
-                // Compare items (order-independent)
-                $existingItemsSorted = collect($existingItems)->sortBy('product_id')->values()->toArray();
-                $newItemsSorted = collect($newItems)->sortBy('product_id')->values()->toArray();
-                
-                if ($existingItemsSorted !== $newItemsSorted || ($payload['currency'] ?? 'USD') !== $existingOrder->currency) {
-                    throw ValidationException::withMessages([
-                        'idempotency_key' => 'Idempotency key already used with different payload'
-                    ]);
-                }
-                
-                $existingOrder->load('items');
-                return ['order' => $existingOrder, 'is_new' => false];
-            }
         }
 
         $products = Product::whereIn('id', collect($itemsInput)->pluck('product_id'))->get()->keyBy('id');
@@ -66,7 +34,7 @@ class OrderService
 
         $meta = $payload['meta'] ?? [];
 
-        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId, $idempotencyKey) {
+        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId) {
             /** @var Order $order */
             $order = Order::create([
                 'shop_customer_id' => $shopCustomerId,
@@ -74,7 +42,6 @@ class OrderService
                 'total_amount' => 0,
                 'currency' => $currency,
                 'trace_id' => $traceId,
-                'idempotency_key' => $idempotencyKey,
             ]);
 
             foreach ($itemsInput as $item) {
@@ -145,7 +112,7 @@ class OrderService
 
         $this->auditLogger->log('order.created', $order, null, ['total' => $orderTotal, 'shop_customer_id' => $shopCustomerId], $traceId);
 
-        return ['order' => $order, 'is_new' => true];
+        return $order;
     }
 
     public function markPaid(Order $order, ?string $traceId = null): Order
@@ -182,14 +149,6 @@ class OrderService
 
         $order->status = Order::STATUS_PAID;
         $order->save();
-
-        // Create accounting voucher (feature-flagged, non-blocking)
-        $this->accountingService->createPaymentVoucher(
-            $order->id,
-            (float) $order->total_amount,
-            $order->currency,
-            $traceId ?? $order->trace_id
-        );
 
         $this->publisher->publish('order.paid', [
             'order_id' => $order->id,

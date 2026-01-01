@@ -40,21 +40,15 @@ class ExpireOrderReservations extends Command
         $this->line('cutoff=' . $cutoff->toDateTimeString() . ' minutes=' . $minutes . ' limit=' . $limit . ' dry_run=' . ($dryRun ? 'true' : 'false'));
 
         // 1) candidate order_ids from inventory DB that still have reserved reservations
-        try {
-            $candidateOrderIds = DB::connection('inventory')
-                ->table('inventory_reservations')
-                ->where('status', 'reserved')
-                ->distinct()
-                ->orderBy('order_id')
-                ->limit($limit * 5) // guard; candidates may include non-expired orders, we filter later
-                ->pluck('order_id')
-                ->values()
-                ->all();
-        } catch (Throwable $e) {
-            $this->warn('Inventory database unavailable: ' . $e->getMessage());
-            $this->warn('Skipping expiration job. Ensure inventory DB is accessible.');
-            return self::SUCCESS; // Exit gracefully, don't crash loop
-        }
+        $candidateOrderIds = DB::connection('inventory')
+            ->table('inventory_reservations')
+            ->where('status', 'reserved')
+            ->distinct()
+            ->orderBy('order_id')
+            ->limit($limit * 5) // guard; candidates may include non-expired orders, we filter later
+            ->pluck('order_id')
+            ->values()
+            ->all();
 
         if (empty($candidateOrderIds)) {
             $this->info('No reserved inventory reservations found. Nothing to do.');
@@ -87,17 +81,11 @@ class ExpireOrderReservations extends Command
             $orderId = (string) $order->id;
 
             // Double-check there are still reserved reservations for this order (idempotency / race-safe)
-            try {
-                $stillReserved = (int) DB::connection('inventory')
-                    ->table('inventory_reservations')
-                    ->where('order_id', $orderId)
-                    ->where('status', 'reserved')
-                    ->count();
-            } catch (Throwable $e) {
-                $this->warn("SKIP order_id={$orderId} reason=inventory_db_unavailable: " . $e->getMessage());
-                $stats['skipped_no_reserved']++;
-                continue;
-            }
+            $stillReserved = (int) DB::connection('inventory')
+                ->table('inventory_reservations')
+                ->where('order_id', $orderId)
+                ->where('status', 'reserved')
+                ->count();
 
             if ($stillReserved <= 0) {
                 $stats['skipped_no_reserved']++;

@@ -5,24 +5,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        // Guard: only create if table doesn't exist
-        if (Schema::hasTable('role_user')) {
-            return;
-        }
-        
-        $usersTableExists = Schema::hasTable('users');
-        
-        Schema::create('role_user', function (Blueprint $table) use ($usersTableExists) {
+        Schema::create('role_user', function (Blueprint $table) {
             $table->id();
             $table->foreignId('role_id')->constrained('roles')->cascadeOnDelete();
-            
-            // Guard: only add FK to users if users table exists
-            if ($usersTableExists) {
-                $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
-            } else {
-                $table->unsignedBigInteger('user_id')->nullable();
-            }
-            
+            $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->timestamps();
             $table->unique(['role_id','user_id']);
         });

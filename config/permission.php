@@ -2,19 +2,6 @@
 
 return [
 
-    /*
-     * Database connection to use for Spatie Permission tables.
-     * Defaults to 'core' connection for multi-db setup.
-     */
-    'connection' => env('PERMISSION_CONNECTION', 'core'),
-
-    /*
-     * Default guard name for roles and permissions.
-     */
-    'defaults' => [
-        'guard_name' => (function_exists('env') ? env('PERMISSION_GUARD_NAME', 'sanctum') : (getenv('PERMISSION_GUARD_NAME') ?: 'sanctum')),
-    ],
-
     'models' => [
 
         /*

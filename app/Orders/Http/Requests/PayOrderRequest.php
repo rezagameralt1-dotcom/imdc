@@ -10,7 +10,6 @@ class PayOrderRequest extends BaseApiRequest
     {
         return [
             'payment_reference' => ['nullable', 'string', 'max:255'],
-            'idempotency_key' => ['nullable', 'string', 'max:255'],
         ];
     }
 }

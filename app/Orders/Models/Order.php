@@ -28,7 +28,6 @@ class Order extends Model
         'total_amount',
         'currency',
         'trace_id',
-        'idempotency_key',
     ];
 
     protected $casts = [
