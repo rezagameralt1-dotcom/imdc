@@ -4,7 +4,7 @@ use Illuminate\Support\Str;
 
 return [
 
-    'default' => env('DB_CONNECTION', 'orders'),
+    'default' => env('DB_CONNECTION', 'core'),
 
     'connections' => [
 
@@ -63,11 +63,11 @@ return [
         'core' => [
             'driver' => 'pgsql',
             'url' => env('CORE_DB_URL'),
-            'host' => env('CORE_DB_HOST', 'core-db'),
-            'port' => env('CORE_DB_PORT', '5432'),
-            'database' => env('CORE_DB_DATABASE', 'imdc_core'),
-            'username' => env('CORE_DB_USERNAME', 'postgres'),
-            'password' => env('CORE_DB_PASSWORD', env('POSTGRES_PASSWORD', '')),
+            'host' => env('DB_CORE_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_CORE_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_CORE_DATABASE', env('DB_DATABASE', 'imdc_core')),
+            'username' => env('DB_CORE_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_CORE_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('CORE_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -78,11 +78,11 @@ return [
         'orders' => [
             'driver' => 'pgsql',
             'url' => env('ORDERS_DB_URL'),
-            'host' => env('ORDERS_DB_HOST', 'orders-db'),
-            'port' => env('ORDERS_DB_PORT', '5432'),
-            'database' => env('ORDERS_DB_DATABASE', 'imdc_orders'),
-            'username' => env('ORDERS_DB_USERNAME', 'postgres'),
-            'password' => env('ORDERS_DB_PASSWORD', env('POSTGRES_PASSWORD', '')),
+            'host' => env('DB_ORDERS_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_ORDERS_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_ORDERS_DATABASE', env('DB_DATABASE', 'imdc_orders')),
+            'username' => env('DB_ORDERS_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_ORDERS_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('ORDERS_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -93,11 +93,11 @@ return [
         'products' => [
             'driver' => 'pgsql',
             'url' => env('PRODUCTS_DB_URL'),
-            'host' => env('PRODUCTS_DB_HOST', 'products-db'),
-            'port' => env('PRODUCTS_DB_PORT', '5432'),
-            'database' => env('PRODUCTS_DB_DATABASE', 'imdc_products'),
-            'username' => env('PRODUCTS_DB_USERNAME', 'postgres'),
-            'password' => env('PRODUCTS_DB_PASSWORD', env('POSTGRES_PASSWORD', '')),
+            'host' => env('DB_PRODUCTS_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_PRODUCTS_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_PRODUCTS_DATABASE', env('DB_DATABASE', 'imdc_products')),
+            'username' => env('DB_PRODUCTS_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_PRODUCTS_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('PRODUCTS_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -108,11 +108,11 @@ return [
         'inventory' => [
             'driver' => 'pgsql',
             'url' => env('INVENTORY_DB_URL'),
-            'host' => env('INVENTORY_DB_HOST', 'inventory-db'),
-            'port' => env('INVENTORY_DB_PORT', '5432'),
-            'database' => env('INVENTORY_DB_DATABASE', 'imdc_inventory'),
-            'username' => env('INVENTORY_DB_USERNAME', 'postgres'),
-            'password' => env('INVENTORY_DB_PASSWORD', env('POSTGRES_PASSWORD', '')),
+            'host' => env('DB_INVENTORY_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_INVENTORY_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_INVENTORY_DATABASE', env('DB_DATABASE', 'imdc_inventory')),
+            'username' => env('DB_INVENTORY_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_INVENTORY_PASSWORD', env('DB_PASSWORD', '')),
             'charset' => env('INVENTORY_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
@@ -157,7 +157,7 @@ return [
 
     'redis' => [
 
-        'client' => env('REDIS_CLIENT', 'phpredis'),
+        'client' => env('REDIS_CLIENT', 'predis'),
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),

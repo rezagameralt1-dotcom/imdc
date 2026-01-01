@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AuthController;
-use App\Http\Controllers\HealthController;
 use App\Inventory\Http\Controllers\InventoryController;
 use App\Orders\Http\Controllers\OrderController;
 use App\Products\Http\Controllers\ProductController;
@@ -9,7 +8,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function () {
     // Health check endpoint (no auth required for monitoring)
-    Route::get('health/db', [HealthController::class, 'db']);
+    // Note: HealthController was removed, health endpoint disabled
     
     Route::post('auth/register', [AuthController::class, 'register']);
     Route::post('auth/login', [AuthController::class, 'login']);

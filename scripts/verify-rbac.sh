@@ -81,7 +81,7 @@ php_pg_query() {
   # Temporarily disable exit on error for PHP call
   set +e
   php_output="$(cd "$ROOT_DIR" && IMDC_SQL="$sql" php -r '
-    $h=getenv("DB_HOST") ?: (getenv("CORE_DB_HOST") ?: "core-db");
+    $h=getenv("DB_CORE_HOST") ?: (getenv("DB_HOST") ?: "db");
     $p=getenv("DB_PORT") ?: (getenv("CORE_DB_PORT") ?: "5432");
     $d=getenv("DB_DATABASE") ?: (getenv("CORE_DB_DATABASE") ?: "imdc_core");
     $u=getenv("DB_USERNAME") ?: (getenv("CORE_DB_USERNAME") ?: "postgres");
@@ -120,7 +120,7 @@ php_pg_query_kv() {
   # Temporarily disable exit on error for PHP call
   set +e
   php_output="$(cd "$ROOT_DIR" && IMDC_SQL="$sql" php -r '
-    $h=getenv("DB_HOST") ?: (getenv("CORE_DB_HOST") ?: "core-db");
+    $h=getenv("DB_CORE_HOST") ?: (getenv("DB_HOST") ?: "db");
     $p=getenv("DB_PORT") ?: (getenv("CORE_DB_PORT") ?: "5432");
     $d=getenv("DB_DATABASE") ?: (getenv("CORE_DB_DATABASE") ?: "imdc_core");
     $u=getenv("DB_USERNAME") ?: (getenv("CORE_DB_USERNAME") ?: "postgres");
@@ -159,7 +159,7 @@ php_pg_query_all() {
   # Temporarily disable exit on error for PHP call
   set +e
   php_output="$(cd "$ROOT_DIR" && IMDC_SQL="$sql" php -r '
-    $h=getenv("DB_HOST") ?: (getenv("CORE_DB_HOST") ?: "core-db");
+    $h=getenv("DB_CORE_HOST") ?: (getenv("DB_HOST") ?: "db");
     $p=getenv("DB_PORT") ?: (getenv("CORE_DB_PORT") ?: "5432");
     $d=getenv("DB_DATABASE") ?: (getenv("CORE_DB_DATABASE") ?: "imdc_core");
     $u=getenv("DB_USERNAME") ?: (getenv("CORE_DB_USERNAME") ?: "postgres");

@@ -4,8 +4,9 @@ return [
 
     /*
      * Database connection to use for Spatie Permission tables.
+     * Defaults to 'core' connection for multi-db setup.
      */
-    'connection' => (function_exists('env') ? env('PERMISSION_CONNECTION', env('DB_CONNECTION', 'pgsql')) : (getenv('PERMISSION_CONNECTION') ?: (getenv('DB_CONNECTION') ?: 'pgsql'))),
+    'connection' => env('PERMISSION_CONNECTION', 'core'),
 
     /*
      * Default guard name for roles and permissions.

@@ -33,17 +33,43 @@ class OrderController extends ApiController
 
     public function store(CreateOrderRequest $request)
     {
-        $this->authorize('create', Order::class);
+        try {
+            $this->authorize('create', Order::class);
 
-        $shopCustomerId = $this->shopCustomerResolver->resolveForUserId($request->user()->id);
+            $shopCustomerId = $this->shopCustomerResolver->resolveForUserId($request->user()->id);
 
-        $order = $this->service->create(
-            $request->validated(),
-            $shopCustomerId,
-            $request->attributes->get('trace_id')
-        );
+            $result = $this->service->create(
+                $request->validated(),
+                $shopCustomerId,
+                $request->attributes->get('trace_id')
+            );
 
-        return $this->successResponse($order, 201);
+            // Return 200 for idempotent returns, 201 for new orders
+            $statusCode = $result['is_new'] ? 201 : 200;
+            return $this->successResponse($result['order'], $statusCode);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            // Check if it's an idempotency key conflict
+            if ($e->errors() && isset($e->errors()['idempotency_key'])) {
+                return $this->errorResponse(
+                    'Idempotency key conflict',
+                    409,
+                    ['fields' => $e->errors()]
+                );
+            }
+            // Return 422 for validation errors
+            return $this->errorResponse(
+                'Validation failed',
+                422,
+                ['fields' => $e->errors()]
+            );
+        } catch (\Exception $e) {
+            // Log unexpected errors but return generic message to client
+            \Log::error('Order creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return $this->errorResponse('Order creation failed', 500);
+        }
     }
 
     public function show(string $id)

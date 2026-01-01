@@ -22,20 +22,40 @@ class OrderService
     ) {
     }
 
-    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): Order
+    public function create(array $payload, string $shopCustomerId, ?string $traceId = null): array
     {
         $itemsInput = $payload['items'] ?? [];
         if (empty($itemsInput)) {
             throw ValidationException::withMessages(['items' => 'At least one item is required.']);
         }
 
-        // Idempotency check: if idempotency_key provided, return existing order
+        // Idempotency check: if idempotency_key provided, validate or return existing order
         $idempotencyKey = $payload['idempotency_key'] ?? null;
         if ($idempotencyKey) {
             $existingOrder = Order::where('idempotency_key', $idempotencyKey)->first();
             if ($existingOrder) {
+                // Verify payload matches existing order
+                $existingItems = $existingOrder->items->map(fn($item) => [
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                ])->toArray();
+                $newItems = collect($itemsInput)->map(fn($item) => [
+                    'product_id' => $item['product_id'],
+                    'quantity' => (int) $item['quantity'],
+                ])->toArray();
+                
+                // Compare items (order-independent)
+                $existingItemsSorted = collect($existingItems)->sortBy('product_id')->values()->toArray();
+                $newItemsSorted = collect($newItems)->sortBy('product_id')->values()->toArray();
+                
+                if ($existingItemsSorted !== $newItemsSorted || ($payload['currency'] ?? 'USD') !== $existingOrder->currency) {
+                    throw ValidationException::withMessages([
+                        'idempotency_key' => 'Idempotency key already used with different payload'
+                    ]);
+                }
+                
                 $existingOrder->load('items');
-                return $existingOrder;
+                return ['order' => $existingOrder, 'is_new' => false];
             }
         }
 
@@ -125,7 +145,7 @@ class OrderService
 
         $this->auditLogger->log('order.created', $order, null, ['total' => $orderTotal, 'shop_customer_id' => $shopCustomerId], $traceId);
 
-        return $order;
+        return ['order' => $order, 'is_new' => true];
     }
 
     public function markPaid(Order $order, ?string $traceId = null): Order

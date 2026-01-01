@@ -1,24 +1,53 @@
-version: "3.8"
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile.php
     image: imdc-php:8.2
-    container_name: imdc_app
     working_dir: /var/www/html
     volumes:
       - ../../:/var/www/html
     depends_on:
       - db
       - redis
+    restart: unless-stopped
+    environment:
+      - DB_CONNECTION=core
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_DATABASE=imdc_core
+      - DB_USERNAME=imdc
+      - DB_PASSWORD=imdc
+      - PERMISSION_CONNECTION=core
+      - DB_CORE_HOST=db
+      - DB_CORE_PORT=5432
+      - DB_CORE_DATABASE=imdc_core
+      - DB_CORE_USERNAME=imdc
+      - DB_CORE_PASSWORD=imdc
+      - DB_PRODUCTS_HOST=db
+      - DB_PRODUCTS_PORT=5432
+      - DB_PRODUCTS_DATABASE=imdc_products
+      - DB_PRODUCTS_USERNAME=imdc
+      - DB_PRODUCTS_PASSWORD=imdc
+      - DB_ORDERS_HOST=db
+      - DB_ORDERS_PORT=5432
+      - DB_ORDERS_DATABASE=imdc_orders
+      - DB_ORDERS_USERNAME=imdc
+      - DB_ORDERS_PASSWORD=imdc
+      - DB_INVENTORY_HOST=db
+      - DB_INVENTORY_PORT=5432
+      - DB_INVENTORY_DATABASE=imdc_inventory
+      - DB_INVENTORY_USERNAME=imdc
+      - DB_INVENTORY_PASSWORD=imdc
+      - POSTGRES_PASSWORD=imdc
+      - REDIS_HOST=redis
+      - REDIS_CLIENT=predis
 
   web:
     build:
-      context: .
-      dockerfile: Dockerfile.nginx
+      context: ..
+      dockerfile: docker/Dockerfile.nginx
     image: imdc-nginx:1.24
-    container_name: imdc_web
     ports:
       - "8080:80"
     volumes:
@@ -26,24 +55,21 @@ services:
       - ../nginx/site.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       - app
+    restart: unless-stopped
 
   db:
     image: postgres:15-alpine
-    container_name: imdc_db
     environment:
       POSTGRES_DB: imdc
       POSTGRES_USER: imdc
       POSTGRES_PASSWORD: imdc
-    ports:
-      - "5432:5432"
     volumes:
       - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
-    container_name: imdc_redis
-    ports:
-      - "6379:6379"
+    restart: unless-stopped
 
 volumes:
   db_data: {}

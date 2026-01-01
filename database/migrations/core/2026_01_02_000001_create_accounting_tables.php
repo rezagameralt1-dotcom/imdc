@@ -54,10 +54,11 @@ return new class extends Migration
         }
 
         // Voucher Entries (Lines in a voucher)
+        // Must be created after accounting_vouchers exists (FK dependency)
         if (!Schema::connection('core')->hasTable('accounting_voucher_entries')) {
             Schema::connection('core')->create('accounting_voucher_entries', function (Blueprint $table) {
                 $table->uuid('id')->primary()->default(DB::raw('gen_random_uuid()'));
-                $table->uuid('voucher_id');
+                $table->uuid('voucher_id'); // FK to accounting_vouchers.id (uuid)
                 $table->string('account_code', 50);
                 $table->string('account_name');
                 $table->decimal('debit', 15, 2)->default(0);
@@ -66,7 +67,8 @@ return new class extends Migration
                 $table->integer('sequence')->default(0);
                 $table->timestamps();
                 
-                $table->foreign('voucher_id')->references('id')->on('accounting_vouchers')->cascadeOnDelete();
+                // Foreign key: voucher_id (uuid) -> accounting_vouchers.id (uuid)
+                $table->foreign('voucher_id')->references('id')->on('accounting_vouchers')->onDelete('cascade');
                 $table->index('voucher_id');
             });
         }
