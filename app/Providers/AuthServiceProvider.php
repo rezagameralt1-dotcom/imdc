@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use App\Inventory\Models\InventoryItem;
 use App\Inventory\Policies\InventoryPolicy;
+use App\Nfts\Models\NftToken;
+use App\Nfts\Policies\NftPolicy;
 use App\Orders\Models\Order;
 use App\Orders\Policies\OrderPolicy;
 use App\Products\Models\Product;
@@ -18,6 +20,7 @@ class AuthServiceProvider extends ServiceProvider
         Product::class => ProductPolicy::class,
         Order::class => OrderPolicy::class,
         InventoryItem::class => InventoryPolicy::class,
+        NftToken::class => NftPolicy::class,
     ];
 
     public function boot(): void

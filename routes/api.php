@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Inventory\Http\Controllers\InventoryController;
+use App\Nfts\Http\Controllers\NftController;
 use App\Orders\Http\Controllers\OrderController;
 use App\Products\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +52,13 @@ Route::prefix('v1')->group(function () {
         Route::get('inventory/{productId}', [InventoryController::class, 'show']);
         Route::post('inventory/{productId}/adjust', [InventoryController::class, 'adjust']);
         Route::post('inventory/reserve', [InventoryController::class, 'reserve']);
+
+        // NFT routes (feature-flagged)
+        if (config('nft.enabled', false)) {
+            Route::post('nfts/mint', [NftController::class, 'mint']);
+            Route::post('nfts/transfer', [NftController::class, 'transfer']);
+            Route::get('nfts/tokens', [NftController::class, 'index']);
+        }
     });
 });
 
