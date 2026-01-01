@@ -28,7 +28,7 @@
 - `database/seeders/CoreRbacSeeder.php`: اضافه شدن permissions NFT
 - `app/Providers/AuthServiceProvider.php`: اضافه شدن NftPolicy
 - `scripts/verify-lock.sh`: اضافه شدن conditional NFT guardrail
-- `infra/docker/docker-compose.yml`: اضافه شدن environment variables برای nfts database
+- `backend/infra/docker/docker-compose.yml`: اضافه شدن environment variables برای nfts database
 
 ### فایل‌های مرتبط با M03 (idempotency fix)
 
@@ -128,11 +128,11 @@ SKIPPED: NFT verification
 export FEATURE_NFT=true
 
 # اجرای migrations
-docker compose -f infra/docker/docker-compose.yml exec app \
+docker compose -f backend/infra/docker/docker-compose.yml exec app \
   php artisan migrate --database=nfts --path=database/migrations/nfts
 
 # اجرای NFT guardrail
-docker compose -f infra/docker/docker-compose.yml exec app \
+docker compose -f backend/infra/docker/docker-compose.yml exec app \
   sh -lc "cd /var/www/html && FEATURE_NFT=true ./scripts/verify-nft.sh --in-container"
 
 # اجرای lock verification (شامل NFT guardrail)

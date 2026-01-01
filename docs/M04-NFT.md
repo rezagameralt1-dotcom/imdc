@@ -248,7 +248,7 @@ export FEATURE_NFT=true
 ./scripts/verify-nft.sh
 
 # Or via docker compose
-docker compose -f infra/docker/docker-compose.yml exec app \
+docker compose -f backend/infra/docker/docker-compose.yml exec app \
   sh -lc "cd /var/www/html && FEATURE_NFT=true ./scripts/verify-nft.sh --in-container"
 ```
 
@@ -282,7 +282,7 @@ php artisan migrate --database=nfts --path=database/migrations/nfts
 یا در محیط Docker:
 
 ```bash
-docker compose -f infra/docker/docker-compose.yml exec app \
+docker compose -f backend/infra/docker/docker-compose.yml exec app \
   php artisan migrate --database=nfts --path=database/migrations/nfts
 ```
 
@@ -297,7 +297,7 @@ docker compose -f infra/docker/docker-compose.yml exec app \
 FEATURE_NFT=true ./scripts/verify-nft.sh
 
 # در محیط container
-docker compose -f infra/docker/docker-compose.yml exec app \
+docker compose -f backend/infra/docker/docker-compose.yml exec app \
   sh -lc "cd /var/www/html && FEATURE_NFT=true ./scripts/verify-nft.sh --in-container"
 ```
 

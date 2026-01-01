@@ -162,7 +162,7 @@
 ## Implementation Notes
 
 - All guardrails are production-ready, deterministic, and schema-aware where applicable.
-- Feature flags (FEATURE_NFT, FEATURE_DID) control guardrail execution but do not affect core functionality when disabled.
+- Feature flags (FEATURE_NFT, FEATURE_DID, FEATURE_LINKING) control guardrail execution but do not affect core functionality when disabled.
 - Helper scripts under `scripts/_guardrail/` provide reusable guardrail utilities (ensure_guardrail_product.php, cleanup_guardrail_product.php).
 - NFT module is production-ready, fully wired but disabled by default (`FEATURE_NFT=false`).
 - NFT endpoints follow API contract: `{ success, data|error, trace_id }`.
@@ -171,6 +171,12 @@
 - WORM canonicalization is single source of truth: `WormHasher::compute()` used by both writer and verifier.
 - WORM hash computation is deterministic: delimiter-joined string format, normalized types, ISO8601 timestamps.
 - WORM chain verification PASS: all logs verify correctly with canonical hash computation.
+
+**Docker Compose Configuration:**
+- Canonical compose file path: `backend/infra/docker/docker-compose.yml` (relative to project root).
+- Guardrail scripts (executed from backend directory) use: `infra/docker/docker-compose.yml` (relative to backend root).
+- Documentation and instructions reference the canonical path from project root: `backend/infra/docker/docker-compose.yml`.
+- This ensures consistent behavior across all scripts and documentation.
 
 ---
 
