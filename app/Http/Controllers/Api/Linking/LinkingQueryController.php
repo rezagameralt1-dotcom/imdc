@@ -18,10 +18,7 @@ class LinkingQueryController extends ApiController
     {
         $user = $request->user();
 
-        // Check permission
-        if (!$user->hasPermission('linking.admin') && !$user->hasPermission('linking.read')) {
-            return $this->errorResponse('Unauthorized: linking.read permission required', 403);
-        }
+        // Route middleware ensures Admin or Auditor role
 
         try {
             $links = $this->linkingService->getLinksForDid($didId);
@@ -35,10 +32,7 @@ class LinkingQueryController extends ApiController
     {
         $user = $request->user();
 
-        // Check permission
-        if (!$user->hasPermission('linking.admin') && !$user->hasPermission('linking.read')) {
-            return $this->errorResponse('Unauthorized: linking.read permission required', 403);
-        }
+        // Route middleware ensures Admin or Auditor role
 
         try {
             $links = $this->linkingService->getLinksForOrder($orderId);
@@ -52,10 +46,7 @@ class LinkingQueryController extends ApiController
     {
         $user = $request->user();
 
-        // Check permission
-        if (!$user->hasPermission('linking.admin') && !$user->hasPermission('linking.read')) {
-            return $this->errorResponse('Unauthorized: linking.read permission required', 403);
-        }
+        // Route middleware ensures Admin or Auditor role
 
         try {
             $links = $this->linkingService->getLinksForNft($nftId);

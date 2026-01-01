@@ -21,37 +21,16 @@ class DidNftLinkController extends ApiController
         $user = $request->user();
         $data = $request->validated();
 
-        // Check permission
-        if (!$user->hasPermission('linking.admin')) {
-            if (!$user->hasPermission('linking.create')) {
-                return $this->errorResponse('Unauthorized: linking.create permission required', 403);
-            }
-
-            // Ownership checks: both DID and NFT must belong to user
-            $didProfile = DidProfile::where('id', $data['did_id'])
-                ->where('user_id', $user->id)
-                ->first();
-
-            if (!$didProfile) {
-                return $this->errorResponse('Unauthorized: DID does not belong to user', 403);
-            }
-
-            $nft = NftToken::find($data['nft_id']);
-            if (!$nft) {
-                return $this->errorResponse('NFT not found', 404);
-            }
-
-            if ($nft->owner_user_id != $user->id) {
-                return $this->errorResponse('Unauthorized: NFT does not belong to user', 403);
-            }
-        }
+        // Route middleware ensures Admin role, so ownership checks are bypassed
+        // Admin can create any links
 
         try {
+            // created_by is optional; if not provided, set to null (user.id is integer, created_by expects UUID)
             $link = $this->linkingService->createDidNftLink(
                 $data['did_id'],
                 $data['nft_id'],
                 $data['role'] ?? 'owner',
-                $user->id,
+                null, // created_by: nullable UUID (user.id is integer, cannot map to UUID)
                 $this->traceId()
             );
 

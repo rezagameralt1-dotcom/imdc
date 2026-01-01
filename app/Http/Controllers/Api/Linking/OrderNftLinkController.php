@@ -21,48 +21,16 @@ class OrderNftLinkController extends ApiController
         $user = $request->user();
         $data = $request->validated();
 
-        // Check permission
-        if (!$user->hasPermission('linking.admin')) {
-            if (!$user->hasPermission('linking.create')) {
-                return $this->errorResponse('Unauthorized: linking.create permission required', 403);
-            }
-
-            // Ownership checks: both Order and NFT must belong to user
-            $order = Order::find($data['order_id']);
-            if (!$order) {
-                return $this->errorResponse('Order not found', 404);
-            }
-
-            // Order ownership check (conservative: require admin if can't verify)
-            if (isset($order->shop_customer_id)) {
-                // Try to verify ownership via shop_customer_id -> user mapping
-                // For now, if we can't verify, require admin
-                if (!$user->hasPermission('linking.admin')) {
-                    return $this->errorResponse('Unauthorized: Cannot verify order ownership without linking.admin permission', 403);
-                }
-            } else {
-                // No shop_customer_id, require admin
-                if (!$user->hasPermission('linking.admin')) {
-                    return $this->errorResponse('Unauthorized: Cannot verify order ownership without linking.admin permission', 403);
-                }
-            }
-
-            $nft = NftToken::find($data['nft_id']);
-            if (!$nft) {
-                return $this->errorResponse('NFT not found', 404);
-            }
-
-            if ($nft->owner_user_id != $user->id) {
-                return $this->errorResponse('Unauthorized: NFT does not belong to user', 403);
-            }
-        }
+        // Route middleware ensures Admin role, so ownership checks are bypassed
+        // Admin can create any links
 
         try {
+            // created_by is optional; if not provided, set to null (user.id is integer, created_by expects UUID)
             $link = $this->linkingService->createOrderNftLink(
                 $data['order_id'],
                 $data['nft_id'],
                 $data['purpose'] ?? 'fulfillment',
-                $user->id,
+                null, // created_by: nullable UUID (user.id is integer, cannot map to UUID)
                 $this->traceId()
             );
 
