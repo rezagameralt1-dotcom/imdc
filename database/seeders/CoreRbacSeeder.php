@@ -47,6 +47,9 @@ final class CoreRbacSeeder extends Seeder
             ['name' => 'nft.mint',         'description' => 'Mint NFT tokens'],
             ['name' => 'nft.transfer',     'description' => 'Transfer NFT tokens'],
             ['name' => 'nft.read',         'description' => 'Read NFT tokens'],
+
+            // DID permissions
+            ['name' => 'did.manage.self',  'description' => 'Manage own DID profile'],
         ];
 
         foreach ($permissions as $p) {
@@ -91,6 +94,7 @@ final class CoreRbacSeeder extends Seeder
             'products.manage', 'orders.manage', 'inventory.manage',
             'products.view', 'products.create', 'products.update',
             'nft.mint', 'nft.transfer', 'nft.read',
+            'did.manage.self',
         ]);
 
         $attach($managerRoleId, [
