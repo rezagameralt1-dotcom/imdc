@@ -134,16 +134,24 @@ echo
 # Check 3.5: Linking guardrail (if FEATURE_LINKING enabled)
 echo "Check 3.5: Linking guardrail (if FEATURE_LINKING enabled)..."
 FEATURE_LINKING_ENABLED=false
+FEATURE_LINKING_VALUE=""
+
+# Read from .env file first (deterministic)
 if [[ -f "$ENV_FILE" ]]; then
     FEATURE_LINKING_FROM_ENV="$(grep -E "^FEATURE_LINKING=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
     if [[ -n "$FEATURE_LINKING_FROM_ENV" ]]; then
+        FEATURE_LINKING_VALUE="$FEATURE_LINKING_FROM_ENV"
         FEATURE_LINKING_NORMALIZED="$(echo "$FEATURE_LINKING_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
         if [[ "$FEATURE_LINKING_NORMALIZED" == "true" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "1" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "yes" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "on" ]]; then
             FEATURE_LINKING_ENABLED=true
         fi
     fi
-else
-    if [[ "${FEATURE_LINKING:-false}" == "true" ]]; then
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_LINKING_VALUE" ]]; then
+    FEATURE_LINKING_VALUE="${FEATURE_LINKING:-false}"
+    if [[ "$FEATURE_LINKING_VALUE" == "true" ]] || [[ "$FEATURE_LINKING_VALUE" == "1" ]]; then
         FEATURE_LINKING_ENABLED=true
     fi
 fi
@@ -153,11 +161,11 @@ if [[ "$FEATURE_LINKING_ENABLED" == "true" ]]; then
         LINKING_EXIT=0
         if is_container "${1:-}"; then
             cd /var/www/html || exit 1
-            IMDC_API_BASE_URL=http://web:80 ./scripts/verify-linking.sh --in-container > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+            FEATURE_LINKING=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-linking.sh --in-container > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
         elif has_docker_compose; then
-            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-linking.sh --in-container" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_LINKING=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-linking.sh --in-container" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
         else
-            "$SCRIPT_DIR/verify-linking.sh" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+            FEATURE_LINKING=true "$SCRIPT_DIR/verify-linking.sh" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
         fi
         
         if [[ $LINKING_EXIT -eq 0 ]]; then
@@ -176,7 +184,7 @@ if [[ "$FEATURE_LINKING_ENABLED" == "true" ]]; then
         ERRORS=$((ERRORS + 1))
     fi
 else
-    echo "  SKIPPED: FEATURE_LINKING is not enabled (FEATURE_LINKING=${FEATURE_LINKING_FROM_ENV:-${FEATURE_LINKING:-false}})"
+    echo "  SKIPPED: FEATURE_LINKING is not enabled (FEATURE_LINKING=${FEATURE_LINKING_VALUE})"
 fi
 echo
 

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
  * Audit Ping Controller - Health check endpoint for Admin or Auditor role
  * 
  * Endpoint: GET /api/audit/ping
- * Middleware: auth:sanctum, role:Admin,Auditor
+ * Middleware: auth:sanctum, role:Admin|Auditor
  * 
  * POLICY: Broad access - requires Admin OR Auditor role.
  * Both Admin and Auditor users can access this endpoint.

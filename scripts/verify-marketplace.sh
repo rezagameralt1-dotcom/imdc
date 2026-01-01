@@ -25,7 +25,7 @@ elif has_docker_compose; then
     echo
     echo "Execution context: host-delegating"
     echo
-    docker compose exec -T app sh -lc 'cd /var/www/html && ./scripts/verify-marketplace.sh --in-container'
+    docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc 'cd /var/www/html && ./scripts/verify-marketplace.sh --in-container'
     exit $?
 else
     EXEC_CTX="host-direct"

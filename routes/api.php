@@ -34,7 +34,7 @@ Route::prefix('v1')->group(function () {
         // Access policy: Admin OR Auditor (locked).
         if (class_exists(\App\Http\Controllers\Api\AuditPingController::class)) {
             Route::get('audit/ping', [\App\Http\Controllers\Api\AuditPingController::class])
-                ->middleware('role:Admin,Auditor');
+                ->middleware('role:Admin|Auditor');
         }
         
         Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -78,11 +78,11 @@ Route::prefix('v1')->group(function () {
             Route::post('order-nft', [\App\Http\Controllers\Api\Linking\OrderNftLinkController::class, 'store'])
                 ->middleware('role:Admin');
             Route::get('did/{didId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByDid'])
-                ->middleware('role:Admin,Auditor');
+                ->middleware('role:Admin|Auditor');
             Route::get('order/{orderId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByOrder'])
-                ->middleware('role:Admin,Auditor');
+                ->middleware('role:Admin|Auditor');
             Route::get('nft/{nftId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByNft'])
-                ->middleware('role:Admin,Auditor');
+                ->middleware('role:Admin|Auditor');
         });
     });
 });
@@ -106,7 +106,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Access policy: Admin OR Auditor (locked).
     if (class_exists(\App\Http\Controllers\Api\AuditPingController::class)) {
         Route::get('/audit/ping', \App\Http\Controllers\Api\AuditPingController::class)
-            ->middleware('role:Admin,Auditor');
+            ->middleware('role:Admin|Auditor');
     }
 });
 
