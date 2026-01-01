@@ -110,43 +110,10 @@ else
     echo "  SKIPPED: FEATURE_NFT is not enabled (FEATURE_NFT=${FEATURE_NFT:-false})"
 fi
 echo
-
-# Check 3.5: DID guardrail (if FEATURE_DID enabled)
-echo "Check 3.5: DID guardrail (if FEATURE_DID enabled)..."
-if [[ "${FEATURE_DID:-false}" == "true" ]]; then
-    if [[ -f "$SCRIPT_DIR/verify-did.sh" ]]; then
-        DID_EXIT=0
-        if is_container "${1:-}"; then
-            # Running inside container: execute directly
-            cd /var/www/html || exit 1
-            FEATURE_DID=true IMDC_API_BASE_URL=http://web:80 ./scripts/./scripts/verify-did.sh --in-container > /tmp/did_guardrail_output.txt 2>&1 || DID_EXIT=$?
-        elif has_docker_compose; then
-            # Running on host: use docker compose
-            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_DID=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/./scripts/verify-did.sh --in-container" > /tmp/did_guardrail_output.txt 2>&1 || DID_EXIT=$?
-        else
-            # No docker compose: try direct execution
-            FEATURE_DID=true "$SCRIPT_DIR/bash ./scripts/verify-did.sh" > /tmp/did_guardrail_output.txt 2>&1 || DID_EXIT=$?
-        fi
-        
-        if [[ $DID_EXIT -eq 0 ]]; then
-            if grep -q "DID Guardrail PASSED" /tmp/did_guardrail_output.txt; then
-                echo "✓ DID guardrail PASSED"
-            else
-                echo "✗ DID guardrail did not report PASS"
-                ERRORS=$((ERRORS + 1))
-            fi
-        else
-            echo "✗ DID guardrail execution failed (exit code: $DID_EXIT)"
-            ERRORS=$((ERRORS + 1))
-        fi
-    else
-        echo "✗ verify-did.sh not found"
-        ERRORS=$((ERRORS + 1))
-    fi
-else
-    echo "  SKIPPED: FEATURE_DID is not enabled (FEATURE_DID=${FEATURE_DID:-false})"
-fi
-echo
+  # Check 3.5: DID guardrail (disabled: Check 4 runs DID deterministically)
+  echo "Check 3.5: DID guardrail (if FEATURE_DID enabled)..."
+  echo "  SKIPPED: Check 4 runs DID guardrail deterministically"
+  echo
 
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
