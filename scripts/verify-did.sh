@@ -103,23 +103,39 @@ fi
 echo "    ✓ Core migrations complete"
 echo
 
-# Pre-flight: Verify DID routes exist
-echo "Pre-flight: Verifying DID routes are registered..."
+# Pre-flight: Clear route cache and verify DID routes exist
+echo "Pre-flight: Clearing route cache and verifying DID routes are registered..."
 set +e
+php artisan route:clear 2>/dev/null || true
 ROUTE_CHECK="$(php artisan route:list --path=api/v1/did/me 2>&1)"
 ROUTE_CHECK_EXIT=$?
 set -e
-if [[ $ROUTE_CHECK_EXIT -ne 0 ]] || ! echo "$ROUTE_CHECK" | grep -q "did/me"; then
+if [[ $ROUTE_CHECK_EXIT -ne 0 ]] || ! echo "$ROUTE_CHECK" | grep -qE "(did/me|did\.me)"; then
     echo "✗ DID routes are not registered"
     echo "  Expected route: GET/POST/PUT api/v1/did/me"
     echo "  Route list output:"
-    echo "$ROUTE_CHECK" | head -10
+    echo "$ROUTE_CHECK" | head -20
     echo ""
     echo "  ERROR: DID routes must be registered in routes/api.php"
     echo "  Check that DidMeController is imported and routes are defined."
     exit 1
 fi
-echo "    ✓ DID routes registered"
+
+# Verify all three methods are present
+if ! echo "$ROUTE_CHECK" | grep -qE "GET.*did"; then
+    echo "✗ GET /api/v1/did/me route not found"
+    exit 1
+fi
+if ! echo "$ROUTE_CHECK" | grep -qE "POST.*did"; then
+    echo "✗ POST /api/v1/did/me route not found"
+    exit 1
+fi
+if ! echo "$ROUTE_CHECK" | grep -qE "PUT.*did"; then
+    echo "✗ PUT /api/v1/did/me route not found"
+    exit 1
+fi
+
+echo "    ✓ DID routes registered (GET, POST, PUT)"
 echo
 
 # Test 1: Mint authentication token (use admin user)

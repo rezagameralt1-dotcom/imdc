@@ -22,6 +22,11 @@ class DidMeController extends ApiController
      */
     public function show(Request $request): JsonResponse
     {
+        // Check feature flag
+        if (!config('did.enabled', false)) {
+            return $this->errorResponse('DID feature is not enabled', 404);
+        }
+
         // Check permission: did.manage.self or Admin
         $user = $request->user();
         if (!$user->hasRole('Admin') && !$user->hasPermission('did.manage.self')) {
@@ -45,6 +50,11 @@ class DidMeController extends ApiController
      */
     public function store(Request $request): JsonResponse
     {
+        // Check feature flag
+        if (!config('did.enabled', false)) {
+            return $this->errorResponse('DID feature is not enabled', 404);
+        }
+
         // Check permission: did.manage.self or Admin
         $user = $request->user();
         if (!$user->hasRole('Admin') && !$user->hasPermission('did.manage.self')) {
@@ -70,6 +80,11 @@ class DidMeController extends ApiController
      */
     public function update(Request $request): JsonResponse
     {
+        // Check feature flag
+        if (!config('did.enabled', false)) {
+            return $this->errorResponse('DID feature is not enabled', 404);
+        }
+
         // Check permission: did.manage.self or Admin
         $user = $request->user();
         if (!$user->hasRole('Admin') && !$user->hasPermission('did.manage.self')) {

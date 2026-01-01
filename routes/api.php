@@ -61,12 +61,12 @@ Route::prefix('v1')->group(function () {
             Route::get('nfts/tokens/{token}', [NftController::class, 'show']);
         }
 
-        // DID routes (only registered when FEATURE_DID=true)
-        if (config('did.enabled', false)) {
-            Route::get('did/me', [DidMeController::class, 'show']);
-            Route::post('did/me', [DidMeController::class, 'store']);
-            Route::put('did/me', [DidMeController::class, 'update']);
-        }
+        // DID routes (always registered; feature flag checked in controller)
+        Route::prefix('did')->group(function () {
+            Route::get('me', [DidMeController::class, 'show']);
+            Route::post('me', [DidMeController::class, 'store']);
+            Route::put('me', [DidMeController::class, 'update']);
+        });
     });
 });
 
