@@ -2,6 +2,7 @@
 
 namespace App\Orders\Services;
 
+use App\Core\Services\AccountingService;
 use App\Inventory\Services\InventoryService;
 use App\Orders\Models\Order;
 use App\Orders\Models\OrderItem;
@@ -17,6 +18,7 @@ class OrderService
         private readonly InventoryService $inventoryService,
         private readonly RedisStreamPublisher $publisher,
         private readonly AuditLogger $auditLogger,
+        private readonly AccountingService $accountingService,
     ) {
     }
 
@@ -27,6 +29,16 @@ class OrderService
             throw ValidationException::withMessages(['items' => 'At least one item is required.']);
         }
 
+        // Idempotency check: if idempotency_key provided, return existing order
+        $idempotencyKey = $payload['idempotency_key'] ?? null;
+        if ($idempotencyKey) {
+            $existingOrder = Order::where('idempotency_key', $idempotencyKey)->first();
+            if ($existingOrder) {
+                $existingOrder->load('items');
+                return $existingOrder;
+            }
+        }
+
         $products = Product::whereIn('id', collect($itemsInput)->pluck('product_id'))->get()->keyBy('id');
 
         $orderTotal = 0;
@@ -34,7 +46,7 @@ class OrderService
 
         $meta = $payload['meta'] ?? [];
 
-        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId) {
+        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId, $idempotencyKey) {
             /** @var Order $order */
             $order = Order::create([
                 'shop_customer_id' => $shopCustomerId,
@@ -42,6 +54,7 @@ class OrderService
                 'total_amount' => 0,
                 'currency' => $currency,
                 'trace_id' => $traceId,
+                'idempotency_key' => $idempotencyKey,
             ]);
 
             foreach ($itemsInput as $item) {
@@ -149,6 +162,14 @@ class OrderService
 
         $order->status = Order::STATUS_PAID;
         $order->save();
+
+        // Create accounting voucher (feature-flagged, non-blocking)
+        $this->accountingService->createPaymentVoucher(
+            $order->id,
+            (float) $order->total_amount,
+            $order->currency,
+            $traceId ?? $order->trace_id
+        );
 
         $this->publisher->publish('order.paid', [
             'order_id' => $order->id,
