@@ -177,16 +177,23 @@ class LinkingService
      *
      * @param string $didId
      * @return array
+     * @throws DomainException
      */
     public function getLinksForDid(string $didId): array
     {
-        $orderLinks = DidOrderLink::where('did_id', $didId)->get();
-        $nftLinks = DidNftLink::where('did_id', $didId)->get();
+        // Validate UUID
+        if (!Str::isUuid($didId)) {
+            throw new DomainException("Invalid did_id format: must be UUID");
+        }
+
+        // Query using core connection (models have connection='core' set)
+        $orderLinks = DidOrderLink::on('core')->where('did_id', $didId)->get();
+        $nftLinks = DidNftLink::on('core')->where('did_id', $didId)->get();
 
         return [
             'did_id' => $didId,
-            'order_links' => $orderLinks,
-            'nft_links' => $nftLinks,
+            'order_links' => $orderLinks->toArray(),
+            'nft_links' => $nftLinks->toArray(),
         ];
     }
 
@@ -195,16 +202,23 @@ class LinkingService
      *
      * @param string $orderId
      * @return array
+     * @throws DomainException
      */
     public function getLinksForOrder(string $orderId): array
     {
-        $didLinks = DidOrderLink::where('order_id', $orderId)->get();
-        $nftLinks = OrderNftLink::where('order_id', $orderId)->get();
+        // Validate UUID
+        if (!Str::isUuid($orderId)) {
+            throw new DomainException("Invalid order_id format: must be UUID");
+        }
+
+        // Query using core connection (models have connection='core' set)
+        $didLinks = DidOrderLink::on('core')->where('order_id', $orderId)->get();
+        $nftLinks = OrderNftLink::on('core')->where('order_id', $orderId)->get();
 
         return [
             'order_id' => $orderId,
-            'did_links' => $didLinks,
-            'nft_links' => $nftLinks,
+            'did_links' => $didLinks->toArray(),
+            'nft_links' => $nftLinks->toArray(),
         ];
     }
 
@@ -213,16 +227,23 @@ class LinkingService
      *
      * @param string $nftId
      * @return array
+     * @throws DomainException
      */
     public function getLinksForNft(string $nftId): array
     {
-        $didLinks = DidNftLink::where('nft_id', $nftId)->get();
-        $orderLinks = OrderNftLink::where('nft_id', $nftId)->get();
+        // Validate UUID
+        if (!Str::isUuid($nftId)) {
+            throw new DomainException("Invalid nft_id format: must be UUID");
+        }
+
+        // Query using core connection (models have connection='core' set)
+        $didLinks = DidNftLink::on('core')->where('nft_id', $nftId)->get();
+        $orderLinks = OrderNftLink::on('core')->where('nft_id', $nftId)->get();
 
         return [
             'nft_id' => $nftId,
-            'did_links' => $didLinks,
-            'order_links' => $orderLinks,
+            'did_links' => $didLinks->toArray(),
+            'order_links' => $orderLinks->toArray(),
         ];
     }
 
