@@ -103,7 +103,12 @@ DB_PORT="${DB_NFTS_PORT:-${DB_PORT:-5432}}"
 DB_USER="${DB_NFTS_USERNAME:-${DB_USERNAME:-imdc}}"
 DB_PASS="${DB_NFTS_PASSWORD:-${DB_PASSWORD:-imdc}}"
 DB_NAME="imdc_nfts"
-POSTGRES_USER="${POSTGRES_USER:-${DB_USER}}"
+# Get POSTGRES_USER from container environment or use default from docker-compose.yml
+if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+    POSTGRES_USER="$(docker compose -f infra/docker/docker-compose.yml exec -T db sh -c 'echo "$POSTGRES_USER"' 2>/dev/null | tr -d '\r\n' || echo "imdc")"
+else
+    POSTGRES_USER="${POSTGRES_USER:-${DB_USER}}"
+fi
 POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-${DB_PASS}}"
 
 # Wait for Postgres to be ready (retry up to 30s)
@@ -149,19 +154,20 @@ set +e
 
 if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
     # On host: use docker compose exec with psql
-    DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>&1)"
+    # Use clean SQL without backslash escaping
+    DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';" 2>&1)"
     if echo "$DB_EXISTS_OUTPUT" | grep -q "1"; then
         echo "  ✓ Database $DB_NAME already exists"
         DB_CREATED=0
     else
         echo "  Creating database $DB_NAME..."
-        docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $DB_NAME" >/dev/null 2>&1
+        docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE ${DB_NAME};" >/dev/null 2>&1
         if [[ $? -eq 0 ]]; then
             echo "  ✓ Database $DB_NAME created"
             DB_CREATED=0
         else
             # May already exist (race condition), check again
-            DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>&1)"
+            DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${DB_NAME}';" 2>&1)"
             if echo "$DB_EXISTS_OUTPUT" | grep -q "1"; then
                 echo "  ✓ Database $DB_NAME exists"
                 DB_CREATED=0
@@ -173,10 +179,11 @@ if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
     fi
 else
     # In container or no docker compose: use PHP/PDO
+    # Use clean SQL without backslash escaping
     DB_CHECK_OUTPUT="$(php artisan tinker --execute="
     try {
         \$conn = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}');
-        \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\");
+        \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'\");
         \$exists = \$stmt->fetch() !== false;
         if (!\$exists) {
             \$conn->exec(\"CREATE DATABASE ${DB_NAME}\");
