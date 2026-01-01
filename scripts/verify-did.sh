@@ -46,6 +46,48 @@ fi
 # Export FEATURE_DID=true for all child processes (artisan, curl, etc.)
 export FEATURE_DID=true
 
+# Backup and modify .env file so php-fpm workers can read FEATURE_DID=true
+ENV_FILE="${ROOT_DIR}/.env"
+ENV_BACKUP=""
+
+# Initialize cleanup function early (before .env modification)
+TMP_BODY="/tmp/imdc_did_guardrail_body.$$"
+cleanup() {
+    rm -f "$TMP_BODY" 2>/dev/null || true
+    # Restore .env if it was backed up
+    if [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]] && [[ -n "$ENV_FILE" ]]; then
+        if [[ -f "$ENV_FILE" ]]; then
+            mv "$ENV_BACKUP" "$ENV_FILE" 2>/dev/null || true
+            # Clear caches after restore
+            php artisan config:clear 2>/dev/null || true
+            php artisan cache:clear 2>/dev/null || true
+        fi
+    fi
+}
+trap cleanup EXIT
+
+if [[ -f "$ENV_FILE" ]]; then
+    TIMESTAMP="$(date +%s)"
+    ENV_BACKUP="${ENV_FILE}.bak.verify-did.${TIMESTAMP}"
+    cp -a "$ENV_FILE" "$ENV_BACKUP"
+    
+    # Ensure FEATURE_DID=true is set in .env
+    if grep -qE "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null; then
+        # Replace existing line
+        if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS sed
+            sed -i '' 's/^FEATURE_DID=.*/FEATURE_DID=true/' "$ENV_FILE"
+        else
+            # Linux sed
+            sed -i 's/^FEATURE_DID=.*/FEATURE_DID=true/' "$ENV_FILE"
+        fi
+    else
+        # Append if not exists
+        echo "FEATURE_DID=true" >> "$ENV_FILE"
+    fi
+    
+fi
+
 # Determine API base URL
 if [[ -n "${IMDC_API_BASE_URL:-}" ]]; then
     API_BASE_URL="${IMDC_API_BASE_URL}"
@@ -58,9 +100,6 @@ fi
 echo "API Base URL: ${API_BASE_URL}"
 echo
 
-TMP_BODY="/tmp/imdc_did_guardrail_body.$$"
-cleanup() { rm -f "$TMP_BODY" 2>/dev/null || true; }
-trap cleanup EXIT
 
 curl_http_code() {
     local url="$1"
@@ -91,20 +130,25 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
-# Pre-flight: Clear caches to ensure FEATURE_DID env is read at runtime
-echo "Pre-flight: Clearing caches to ensure FEATURE_DID is read at runtime..."
+# Pre-flight: Clear caches to ensure FEATURE_DID from .env is read at runtime
+echo "Pre-flight: Clearing caches to ensure FEATURE_DID from .env is read at runtime..."
 echo
 set +e
 php artisan config:clear 2>/dev/null || true
 php artisan cache:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
 set -e
 echo "    ✓ Caches cleared"
 echo
 
-# Debug: Show effective FEATURE_DID value
-echo "Debug: Checking FEATURE_DID environment variable..."
-FEATURE_DID_DEBUG="$(php -r 'echo "FEATURE_DID=".(getenv("FEATURE_DID")?: "not set").PHP_EOL;' 2>/dev/null || echo "FEATURE_DID=check failed")"
-echo "  $FEATURE_DID_DEBUG"
+# Debug: Show effective FEATURE_DID value from .env
+echo "Debug: Checking FEATURE_DID from .env file..."
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_DID_FROM_ENV="$(grep -E "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
+    echo "  FEATURE_DID from .env: ${FEATURE_DID_FROM_ENV}"
+else
+    echo "  .env file not found"
+fi
 echo
 
 # Pre-flight: Run core migrations (for did_profiles table)
