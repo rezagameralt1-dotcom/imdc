@@ -288,7 +288,7 @@ else
   # Tables found = FAIL
   echo "✗ Legacy RBAC tables present (unexpected)"
   echo "  Found tables:"
-  echo "$LEGACY_TABLES_FOUND" | while read -r table; do
+  echo "$LEGACY_TABLES_FOUND" | while read -r table || [ -n "${table}" ]; do
     [[ -n "$table" ]] && echo "    - $table"
   done
   exit 1
@@ -446,7 +446,7 @@ else
     echo "  Mismatched rows: ${ROLES_BAD_COUNT}"
     if [[ -n "$ROLES_DISTINCT_VALUES" ]]; then
       echo "  Distinct values found:"
-      echo "$ROLES_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
+      echo "$ROLES_DISTINCT_VALUES" | while IFS='|' read -r guard count || [ -n "${guard}${count}" ]; do
         [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
       done
     fi
@@ -541,7 +541,7 @@ else
     echo "  Mismatched rows: ${PERMS_BAD_COUNT}"
     if [[ -n "$PERMS_DISTINCT_VALUES" ]]; then
       echo "  Distinct values found:"
-      echo "$PERMS_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
+      echo "$PERMS_DISTINCT_VALUES" | while IFS='|' read -r guard count || [ -n "${guard}${count}" ]; do
         [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
       done
     fi
@@ -609,12 +609,12 @@ else
   echo "✗ Duplicate roles found"
   if [[ "$ROLES_GUARD_NAME_COUNT" == "0" ]]; then
     # No guard_name column - parse as name|count
-    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r name count; do
+    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r name count || [ -n "${name}${count}" ]; do
       [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
     done
   else
     # guard_name column exists - parse as guard_name|name|count
-    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r guard_name name count; do
+    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r guard_name name count || [ -n "${guard_name}${name}${count}" ]; do
       [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
     done
   fi
@@ -681,25 +681,12 @@ else
   echo "✗ Duplicate permissions found"
   if [[ "$PERMS_GUARD_NAME_COUNT" == "0" ]]; then
     # No guard_name column - parse as name|count
-    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r name count; do
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r name count || [ -n "${name}${count}" ]; do
       [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
     done
   else
     # guard_name column exists - parse as guard_name|name|count
-    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count; do
-      [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
-    done
-  fi
-  exit 1
-fi
-echo
-    # No guard_name column - parse as name|count
-    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r name count; do
-      [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
-    done
-  else
-    # guard_name column exists - parse as guard_name|name|count
-    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count; do
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count || [ -n "${guard_name}${name}${count}" ]; do
       [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
     done
   fi
@@ -758,35 +745,26 @@ fi
 echo
 
 echo "8. Verifying config values..."
-# Use plain PHP to load config/permission.php directly (no Laravel bootstrap, no artisan)
+# Use Laravel runtime to read config values (bootstrap Laravel, then use config() helper)
 # Determine expected values from environment
 EXPECT_GUARD="${PERMISSION_GUARD_NAME:-${AUTH_GUARD:-sanctum}}"
 EXPECT_CONN="${PERMISSION_CONNECTION:-pgsql}"
 
 set +e
 CONFIG_OUTPUT="$(cd "$ROOT_DIR" && EXPECT_GUARD="$EXPECT_GUARD" EXPECT_CONN="$EXPECT_CONN" php -r '
-  $root=__DIR__;
-  $cfgFile=$root."/config/permission.php";
-  if (!file_exists($cfgFile)) {
-    fwrite(STDERR, "ERROR: config/permission.php not found".PHP_EOL);
-    exit(1);
-  }
-  $cfg=require $cfgFile;
-  if (!is_array($cfg)) {
-    fwrite(STDERR, "ERROR: config/permission.php did not return array".PHP_EOL);
-    exit(1);
-  }
+  require __DIR__."/vendor/autoload.php";
+  $app = require __DIR__."/bootstrap/app.php";
+  $app->make("Illuminate\Contracts\Console\Kernel")->bootstrap();
+  
   $expectGuard=getenv("EXPECT_GUARD") ?: "sanctum";
   $expectConn=getenv("EXPECT_CONN") ?: "pgsql";
   $errors=array();
   $ok=true;
   
   // Check guard_name (prefer defaults.guard_name, fallback to defaults.guard)
-  $guardName=null;
-  if (isset($cfg["defaults"]["guard_name"])) {
-    $guardName=$cfg["defaults"]["guard_name"];
-  } elseif (isset($cfg["defaults"]["guard"])) {
-    $guardName=$cfg["defaults"]["guard"];
+  $guardName=config("permission.defaults.guard_name");
+  if ($guardName===null) {
+    $guardName=config("permission.defaults.guard");
   }
   if ($guardName===null) {
     $errors[]="defaults.guard_name or defaults.guard missing";
@@ -802,16 +780,17 @@ CONFIG_OUTPUT="$(cd "$ROOT_DIR" && EXPECT_GUARD="$EXPECT_GUARD" EXPECT_CONN="$EX
   }
   
   // Check connection
-  $conn=isset($cfg["connection"]) ? (string)$cfg["connection"] : null;
+  $conn=config("permission.connection");
   if ($conn===null || $conn==="") {
     $errors[]="connection key missing or empty";
     $ok=false;
   } else {
-    if ($conn!==$expectConn) {
-      $errors[]="connection mismatch: expected \"$expectConn\", got \"$conn\"";
+    $connStr=(string)$conn;
+    if ($connStr!==$expectConn) {
+      $errors[]="connection mismatch: expected \"$expectConn\", got \"$connStr\"";
       $ok=false;
     } else {
-      echo "✓ connection: $conn".PHP_EOL;
+      echo "✓ connection: $connStr".PHP_EOL;
     }
   }
   
