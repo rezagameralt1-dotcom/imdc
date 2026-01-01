@@ -25,10 +25,10 @@ Route::prefix('v1')->group(function () {
         Route::get('auth/me', [AuthController::class, 'me']); // Keep for backward compatibility
         
         // RBAC-protected health endpoints
-        // Admin ping: requires Admin role only
+        // Admin ping: requires Admin role only (LOCKED - stable baseline)
         Route::get('admin/ping', [\App\Http\Controllers\Api\AdminPingController::class])
             ->middleware('role:Admin');
-        // Audit ping: requires Admin OR Auditor role (broad access for audit functions)
+        // Access policy: Admin OR Auditor (locked).
         Route::get('audit/ping', [\App\Http\Controllers\Api\AuditPingController::class])
             ->middleware('role:Admin,Auditor');
         
@@ -62,10 +62,10 @@ Route::middleware(['auth:sanctum'])->prefix('market')->group(function () {
 // RBAC smoke-test endpoints (without /v1 prefix)
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', \App\Http\Controllers\Api\MeController::class);
-    // Admin ping: requires Admin role only
+    // Admin ping: requires Admin role only (LOCKED - stable baseline)
     Route::get('/admin/ping', \App\Http\Controllers\Api\AdminPingController::class)
         ->middleware('role:Admin');
-    // Audit ping: requires Admin OR Auditor role (broad access for audit functions)
+    // Access policy: Admin OR Auditor (locked).
     Route::get('/audit/ping', \App\Http\Controllers\Api\AuditPingController::class)
         ->middleware('role:Admin,Auditor');
 });
