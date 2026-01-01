@@ -24,7 +24,7 @@ final class ShopCustomerResolver
 {
     public function resolveForUserId(int $userId): string
     {
-        $row = DB::connection('pgsql')
+        $row = DB::connection('core')
             ->table('shop_customers')
             ->where('user_id', $userId)
             ->first();
@@ -35,7 +35,7 @@ final class ShopCustomerResolver
 
         $alias = (string) Str::uuid();
 
-        $ok = DB::connection('pgsql')
+        $ok = DB::connection('core')
             ->table('shop_customers')
             ->updateOrInsert(
                 ['user_id' => $userId],

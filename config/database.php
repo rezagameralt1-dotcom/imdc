@@ -4,7 +4,7 @@ use Illuminate\Support\Str;
 
 return [
 
-    'default' => env('DB_CONNECTION', 'orders'),
+    'default' => env('DB_CONNECTION', 'core'),
 
     'connections' => [
 
@@ -60,49 +60,64 @@ return [
             ]) : [],
         ],
 
-        'orders' => [
+        'core' => [
             'driver' => 'pgsql',
-            'url' => env('DB_ORDERS_URL'),
-            'host' => env('DB_ORDERS_HOST', '127.0.0.1'),
-            'port' => env('DB_ORDERS_PORT', '5432'),
-            'database' => env('DB_ORDERS_DATABASE', 'imdc_orders'),
-            'username' => env('DB_ORDERS_USERNAME', 'postgres'),
-            'password' => env('DB_ORDERS_PASSWORD', ''),
-            'charset' => env('DB_ORDERS_CHARSET', 'utf8'),
+            'url' => env('CORE_DB_URL'),
+            'host' => env('DB_CORE_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_CORE_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_CORE_DATABASE', env('DB_DATABASE', 'imdc_core')),
+            'username' => env('DB_CORE_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_CORE_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('CORE_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_ORDERS_SCHEMA', 'public'),
-            'sslmode' => env('DB_ORDERS_SSLMODE', 'prefer'),
+            'search_path' => env('CORE_DB_SCHEMA', 'public'),
+            'sslmode' => env('CORE_DB_SSLMODE', 'prefer'),
+        ],
+
+        'orders' => [
+            'driver' => 'pgsql',
+            'url' => env('ORDERS_DB_URL'),
+            'host' => env('DB_ORDERS_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_ORDERS_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_ORDERS_DATABASE', env('DB_DATABASE', 'imdc_orders')),
+            'username' => env('DB_ORDERS_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_ORDERS_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('ORDERS_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('ORDERS_DB_SCHEMA', 'public'),
+            'sslmode' => env('ORDERS_DB_SSLMODE', 'prefer'),
         ],
 
         'products' => [
             'driver' => 'pgsql',
-            'url' => env('DB_PRODUCTS_URL'),
-            'host' => env('DB_PRODUCTS_HOST', '127.0.0.1'),
-            'port' => env('DB_PRODUCTS_PORT', '5432'),
-            'database' => env('DB_PRODUCTS_DATABASE', 'imdc_products'),
-            'username' => env('DB_PRODUCTS_USERNAME', 'postgres'),
-            'password' => env('DB_PRODUCTS_PASSWORD', ''),
-            'charset' => env('DB_PRODUCTS_CHARSET', 'utf8'),
+            'url' => env('PRODUCTS_DB_URL'),
+            'host' => env('DB_PRODUCTS_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_PRODUCTS_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_PRODUCTS_DATABASE', env('DB_DATABASE', 'imdc_products')),
+            'username' => env('DB_PRODUCTS_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_PRODUCTS_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('PRODUCTS_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_PRODUCTS_SCHEMA', 'public'),
-            'sslmode' => env('DB_PRODUCTS_SSLMODE', 'prefer'),
+            'search_path' => env('PRODUCTS_DB_SCHEMA', 'public'),
+            'sslmode' => env('PRODUCTS_DB_SSLMODE', 'prefer'),
         ],
 
         'inventory' => [
             'driver' => 'pgsql',
-            'url' => env('DB_INVENTORY_URL'),
-            'host' => env('DB_INVENTORY_HOST', '127.0.0.1'),
-            'port' => env('DB_INVENTORY_PORT', '5432'),
-            'database' => env('DB_INVENTORY_DATABASE', 'imdc_inventory'),
-            'username' => env('DB_INVENTORY_USERNAME', 'postgres'),
-            'password' => env('DB_INVENTORY_PASSWORD', ''),
-            'charset' => env('DB_INVENTORY_CHARSET', 'utf8'),
+            'url' => env('INVENTORY_DB_URL'),
+            'host' => env('DB_INVENTORY_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_INVENTORY_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_INVENTORY_DATABASE', env('DB_DATABASE', 'imdc_inventory')),
+            'username' => env('DB_INVENTORY_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_INVENTORY_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('INVENTORY_DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_INVENTORY_SCHEMA', 'public'),
-            'sslmode' => env('DB_INVENTORY_SSLMODE', 'prefer'),
+            'search_path' => env('INVENTORY_DB_SCHEMA', 'public'),
+            'sslmode' => env('INVENTORY_DB_SSLMODE', 'prefer'),
         ],
 
         'pgsql' => [
@@ -142,7 +157,7 @@ return [
 
     'redis' => [
 
-        'client' => env('REDIS_CLIENT', 'phpredis'),
+        'client' => env('REDIS_CLIENT', 'predis'),
 
         'options' => [
             'cluster' => env('REDIS_CLUSTER', 'redis'),

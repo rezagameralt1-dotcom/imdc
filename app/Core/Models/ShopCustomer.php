@@ -9,7 +9,7 @@ class ShopCustomer extends Model
 {
     use HasFactory;
 
-    protected $connection = 'pgsql';
+    protected $connection = 'core';
 
     protected $fillable = [
         'user_id',

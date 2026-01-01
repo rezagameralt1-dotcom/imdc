@@ -46,6 +46,11 @@ class ProductService
             throw ValidationException::withMessages(['sku' => 'SKU already exists']);
         }
 
+        // Set seller_id from actor if not provided
+        if (!isset($data['seller_id']) && $actor) {
+            $data['seller_id'] = $actor->id;
+        }
+
         /** @var Product $product */
         $product = DB::connection('products')->transaction(function () use ($data) {
             return Product::create($data);
