@@ -36,13 +36,13 @@ class VerifyWorm extends Command
 
         // Print detailed diagnostics for first mismatch
         if (!empty($result['diagnostics'])) {
-            $diag = $result['diagnostics'][0];
+            $diag = $result['diagnostics'];
             $this->line('');
             $this->warn('Detailed diagnostics for first mismatch:');
             $this->line("  Row ID: {$diag['row_id']}");
             $this->line("  Expected hash: {$diag['expected_hash']}");
             $this->line("  Actual hash: {$diag['actual_hash']}");
-            $this->line("  Created at (normalized): {$diag['created_at_normalized']}");
+            $this->line("  Occurred at (normalized): {$diag['occurred_at_normalized']}");
             $this->line("  Payload JSON (canonical, first 200 chars): {$diag['payload_json_canonical_preview']}");
         }
 

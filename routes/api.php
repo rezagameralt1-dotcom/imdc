@@ -58,7 +58,8 @@ Route::prefix('v1')->group(function () {
         if (config('nft.enabled', false)) {
             Route::post('nfts/mint', [NftController::class, 'mint']);
             Route::post('nfts/transfer', [NftController::class, 'transfer']);
-            Route::get('nfts/tokens/{token}', [NftController::class, 'show']);
+            Route::get('nfts', [NftController::class, 'index']);
+            Route::get('nfts/{id}', [NftController::class, 'show']);
         }
 
         // DID routes (always registered; feature flag checked in controller)
@@ -67,6 +68,24 @@ Route::prefix('v1')->group(function () {
             Route::post('me', [DidMeController::class, 'store']);
             Route::put('me', [DidMeController::class, 'update']);
         });
+
+        // Linking routes (only registered when FEATURE_LINKING=true)
+        if (config('linking.enabled', false)) {
+            Route::middleware(['feature:linking'])->prefix('linking')->group(function () {
+                Route::post('did-order', [\App\Http\Controllers\Api\Linking\DidOrderLinkController::class, 'store'])
+                    ->middleware('permission:linking.create|linking.admin');
+                Route::post('did-nft', [\App\Http\Controllers\Api\Linking\DidNftLinkController::class, 'store'])
+                    ->middleware('permission:linking.create|linking.admin');
+                Route::post('order-nft', [\App\Http\Controllers\Api\Linking\OrderNftLinkController::class, 'store'])
+                    ->middleware('permission:linking.create|linking.admin');
+                Route::get('did/{didId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByDid'])
+                    ->middleware('permission:linking.read|linking.admin');
+                Route::get('order/{orderId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByOrder'])
+                    ->middleware('permission:linking.read|linking.admin');
+                Route::get('nft/{nftId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByNft'])
+                    ->middleware('permission:linking.read|linking.admin');
+            });
+        }
     });
 });
 

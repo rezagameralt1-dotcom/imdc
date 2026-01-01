@@ -377,27 +377,7 @@ echo
 # Test 6: Verify database write
 echo "Test 6: Verifying database write..."
 set +e
-DB_CHECK="$(FEATURE_DID=true php artisan tinker --execute="
-try {
-    \$profile = \App\Dids\Models\DidProfile::where('user_id', ${USER_ID})->first();
-    if (!\$profile) {
-        echo 'not_found';
-        exit(1);
-    }
-    if (\$profile->did !== '${DID_VALUE}') {
-        echo 'did_mismatch';
-        exit(1);
-    }
-    if (\$profile->display_name !== 'Updated DID Name') {
-        echo 'name_mismatch';
-        exit(1);
-    }
-    echo 'ok';
-} catch (Exception \$e) {
-    echo 'error: ' . \$e->getMessage();
-    exit(1);
-}
-" 2>/dev/null | tail -1)"
+DB_CHECK="$(FEATURE_DID=true php "$ROOT_DIR/scripts/_guardrail/verify_did_profile.php" "${USER_ID}" "${DID_VALUE}" 2>/dev/null | tail -1)"
 set -e
 
 if [[ "$DB_CHECK" != "ok" ]]; then

@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\AttachTraceId::class,
             \App\Http\Middleware\ForceJsonResponse::class,
         ]);
+        
+        // Register feature middleware alias
+        $middleware->alias([
+            'feature' => \App\Http\Middleware\EnsureFeatureEnabled::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

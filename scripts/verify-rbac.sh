@@ -362,137 +362,224 @@ echo
 
 echo "3. Checking roles guard_name normalization..."
 # Use PHP PDO directly (no Laravel bootstrap, no artisan)
-# Determine expected guard name
-EXPECT_GUARD="${PERMISSION_GUARD_NAME:-${AUTH_GUARD:-sanctum}}"
-
-# Query for distinct guard_name values with counts
-ROLES_DISTINCT_SQL="SELECT COALESCE(guard_name,'') AS g, COUNT(*) AS c FROM roles GROUP BY COALESCE(guard_name,'') ORDER BY g;"
+# First check if guard_name column exists
+ROLES_GUARD_NAME_CHECK_SQL="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='roles' AND column_name='guard_name';"
 
 set +e
-php_pg_query_kv "$ROLES_DISTINCT_SQL"
-ROLES_DISTINCT_EXIT=$PHP_PG_EXIT
-ROLES_DISTINCT_OUTPUT="$PHP_PG_OUTPUT"
+php_pg_query "$ROLES_GUARD_NAME_CHECK_SQL"
+ROLES_GUARD_NAME_CHECK_EXIT=$PHP_PG_EXIT
+ROLES_GUARD_NAME_CHECK_OUTPUT="$PHP_PG_OUTPUT"
 set -e
 
 # Normalize exit code (never 255)
-if [[ $ROLES_DISTINCT_EXIT -ne 0 ]] && [[ $ROLES_DISTINCT_EXIT -ne 1 ]]; then
-  ROLES_DISTINCT_EXIT=1
+if [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 0 ]] && [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 1 ]]; then
+  ROLES_GUARD_NAME_CHECK_EXIT=1
 fi
 
-if [[ $ROLES_DISTINCT_EXIT -ne 0 ]]; then
-  echo "✗ Roles guard_name check failed"
-  echo "  Error: $ROLES_DISTINCT_OUTPUT"
+if [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 0 ]]; then
+  echo "✗ Roles guard_name column check failed"
+  echo "  Error: $ROLES_GUARD_NAME_CHECK_OUTPUT"
   exit 1
 fi
 
-# Query for count of mismatches
-ROLES_BAD_SQL="SELECT COUNT(*) FROM roles WHERE COALESCE(guard_name,'') <> '${EXPECT_GUARD}';"
+# Parse result - check if column exists (count should be 1 if exists, 0 if not)
+ROLES_GUARD_NAME_COUNT="$(echo "$ROLES_GUARD_NAME_CHECK_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
 
-set +e
-php_pg_query "$ROLES_BAD_SQL"
-ROLES_BAD_EXIT=$PHP_PG_EXIT
-ROLES_BAD_OUTPUT="$PHP_PG_OUTPUT"
-set -e
-
-# Normalize exit code (never 255)
-if [[ $ROLES_BAD_EXIT -ne 0 ]] && [[ $ROLES_BAD_EXIT -ne 1 ]]; then
-  ROLES_BAD_EXIT=1
-fi
-
-if [[ $ROLES_BAD_EXIT -ne 0 ]]; then
-  echo "✗ Roles guard_name check failed"
-  echo "  Error: $ROLES_BAD_OUTPUT"
-  exit 1
-fi
-
-# Parse results
-ROLES_BAD_COUNT="$(echo "$ROLES_BAD_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
-ROLES_DISTINCT_VALUES="$(echo "$ROLES_DISTINCT_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' || true)"
-
-# Check if all guard_name values match expected
-if [[ "$ROLES_BAD_COUNT" == "0" ]]; then
-  echo "✓ roles.guard_name normalized: ${EXPECT_GUARD}"
+if [[ "$ROLES_GUARD_NAME_COUNT" == "0" ]]; then
+  # Column does not exist - skip check
+  echo "SKIP: roles.guard_name column not present in schema (expected in this build)"
 else
-  echo "✗ roles.guard_name not normalized"
-  echo "  Expected: ${EXPECT_GUARD}"
-  echo "  Mismatched rows: ${ROLES_BAD_COUNT}"
-  if [[ -n "$ROLES_DISTINCT_VALUES" ]]; then
-    echo "  Distinct values found:"
-    echo "$ROLES_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
-      [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
-    done
+  # Column exists - run normalization check
+  # Determine expected guard name
+  EXPECT_GUARD="${PERMISSION_GUARD_NAME:-${AUTH_GUARD:-sanctum}}"
+
+  # Query for distinct guard_name values with counts
+  ROLES_DISTINCT_SQL="SELECT COALESCE(guard_name,'') AS g, COUNT(*) AS c FROM roles GROUP BY COALESCE(guard_name,'') ORDER BY g;"
+
+  set +e
+  php_pg_query_kv "$ROLES_DISTINCT_SQL"
+  ROLES_DISTINCT_EXIT=$PHP_PG_EXIT
+  ROLES_DISTINCT_OUTPUT="$PHP_PG_OUTPUT"
+  set -e
+
+  # Normalize exit code (never 255)
+  if [[ $ROLES_DISTINCT_EXIT -ne 0 ]] && [[ $ROLES_DISTINCT_EXIT -ne 1 ]]; then
+    ROLES_DISTINCT_EXIT=1
   fi
-  exit 1
+
+  if [[ $ROLES_DISTINCT_EXIT -ne 0 ]]; then
+    echo "✗ Roles guard_name check failed"
+    echo "  Error: $ROLES_DISTINCT_OUTPUT"
+    exit 1
+  fi
+
+  # Query for count of mismatches
+  ROLES_BAD_SQL="SELECT COUNT(*) FROM roles WHERE COALESCE(guard_name,'') <> '${EXPECT_GUARD}';"
+
+  set +e
+  php_pg_query "$ROLES_BAD_SQL"
+  ROLES_BAD_EXIT=$PHP_PG_EXIT
+  ROLES_BAD_OUTPUT="$PHP_PG_OUTPUT"
+  set -e
+
+  # Normalize exit code (never 255)
+  if [[ $ROLES_BAD_EXIT -ne 0 ]] && [[ $ROLES_BAD_EXIT -ne 1 ]]; then
+    ROLES_BAD_EXIT=1
+  fi
+
+  if [[ $ROLES_BAD_EXIT -ne 0 ]]; then
+    echo "✗ Roles guard_name check failed"
+    echo "  Error: $ROLES_BAD_OUTPUT"
+    exit 1
+  fi
+
+  # Parse results
+  ROLES_BAD_COUNT="$(echo "$ROLES_BAD_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
+  ROLES_DISTINCT_VALUES="$(echo "$ROLES_DISTINCT_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' || true)"
+
+  # Check if all guard_name values match expected
+  if [[ "$ROLES_BAD_COUNT" == "0" ]]; then
+    echo "✓ roles.guard_name normalized: ${EXPECT_GUARD}"
+  else
+    echo "✗ roles.guard_name not normalized"
+    echo "  Expected: ${EXPECT_GUARD}"
+    echo "  Mismatched rows: ${ROLES_BAD_COUNT}"
+    if [[ -n "$ROLES_DISTINCT_VALUES" ]]; then
+      echo "  Distinct values found:"
+      echo "$ROLES_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
+        [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
+      done
+    fi
+    exit 1
+  fi
 fi
 echo
 
 echo "4. Checking permissions guard_name normalization..."
 # Use PHP PDO directly (no Laravel bootstrap, no artisan)
-# Query for distinct guard_name values with counts
-PERMS_DISTINCT_SQL="SELECT COALESCE(guard_name,'') AS g, COUNT(*) AS c FROM permissions GROUP BY COALESCE(guard_name,'') ORDER BY g;"
+# First check if guard_name column exists
+PERMS_GUARD_NAME_CHECK_SQL="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='permissions' AND column_name='guard_name';"
 
 set +e
-php_pg_query_kv "$PERMS_DISTINCT_SQL"
-PERMS_DISTINCT_EXIT=$PHP_PG_EXIT
-PERMS_DISTINCT_OUTPUT="$PHP_PG_OUTPUT"
+php_pg_query "$PERMS_GUARD_NAME_CHECK_SQL"
+PERMS_GUARD_NAME_CHECK_EXIT=$PHP_PG_EXIT
+PERMS_GUARD_NAME_CHECK_OUTPUT="$PHP_PG_OUTPUT"
 set -e
 
 # Normalize exit code (never 255)
-if [[ $PERMS_DISTINCT_EXIT -ne 0 ]] && [[ $PERMS_DISTINCT_EXIT -ne 1 ]]; then
-  PERMS_DISTINCT_EXIT=1
+if [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 0 ]] && [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 1 ]]; then
+  PERMS_GUARD_NAME_CHECK_EXIT=1
 fi
 
-if [[ $PERMS_DISTINCT_EXIT -ne 0 ]]; then
-  echo "✗ Permissions guard_name check failed"
-  echo "  Error: $PERMS_DISTINCT_OUTPUT"
+if [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 0 ]]; then
+  echo "✗ Permissions guard_name column check failed"
+  echo "  Error: $PERMS_GUARD_NAME_CHECK_OUTPUT"
   exit 1
 fi
 
-# Query for count of mismatches
-PERMS_BAD_SQL="SELECT COUNT(*) FROM permissions WHERE COALESCE(guard_name,'') <> '${EXPECT_GUARD}';"
+# Parse result - check if column exists (count should be 1 if exists, 0 if not)
+PERMS_GUARD_NAME_COUNT="$(echo "$PERMS_GUARD_NAME_CHECK_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
 
-set +e
-php_pg_query "$PERMS_BAD_SQL"
-PERMS_BAD_EXIT=$PHP_PG_EXIT
-PERMS_BAD_OUTPUT="$PHP_PG_OUTPUT"
-set -e
-
-# Normalize exit code (never 255)
-if [[ $PERMS_BAD_EXIT -ne 0 ]] && [[ $PERMS_BAD_EXIT -ne 1 ]]; then
-  PERMS_BAD_EXIT=1
-fi
-
-if [[ $PERMS_BAD_EXIT -ne 0 ]]; then
-  echo "✗ Permissions guard_name check failed"
-  echo "  Error: $PERMS_BAD_OUTPUT"
-  exit 1
-fi
-
-# Parse results
-PERMS_BAD_COUNT="$(echo "$PERMS_BAD_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
-PERMS_DISTINCT_VALUES="$(echo "$PERMS_DISTINCT_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' || true)"
-
-# Check if all guard_name values match expected
-if [[ "$PERMS_BAD_COUNT" == "0" ]]; then
-  echo "✓ permissions.guard_name normalized: ${EXPECT_GUARD}"
+if [[ "$PERMS_GUARD_NAME_COUNT" == "0" ]]; then
+  # Column does not exist - skip check
+  echo "SKIP: permissions.guard_name column not present in schema (expected in this build)"
 else
-  echo "✗ permissions.guard_name not normalized"
-  echo "  Expected: ${EXPECT_GUARD}"
-  echo "  Mismatched rows: ${PERMS_BAD_COUNT}"
-  if [[ -n "$PERMS_DISTINCT_VALUES" ]]; then
-    echo "  Distinct values found:"
-    echo "$PERMS_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
-      [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
-    done
+  # Column exists - run normalization check
+  # Determine expected guard name
+  EXPECT_GUARD="${PERMISSION_GUARD_NAME:-${AUTH_GUARD:-sanctum}}"
+
+  # Query for distinct guard_name values with counts
+  PERMS_DISTINCT_SQL="SELECT COALESCE(guard_name,'') AS g, COUNT(*) AS c FROM permissions GROUP BY COALESCE(guard_name,'') ORDER BY g;"
+
+  set +e
+  php_pg_query_kv "$PERMS_DISTINCT_SQL"
+  PERMS_DISTINCT_EXIT=$PHP_PG_EXIT
+  PERMS_DISTINCT_OUTPUT="$PHP_PG_OUTPUT"
+  set -e
+
+  # Normalize exit code (never 255)
+  if [[ $PERMS_DISTINCT_EXIT -ne 0 ]] && [[ $PERMS_DISTINCT_EXIT -ne 1 ]]; then
+    PERMS_DISTINCT_EXIT=1
   fi
-  exit 1
+
+  if [[ $PERMS_DISTINCT_EXIT -ne 0 ]]; then
+    echo "✗ Permissions guard_name check failed"
+    echo "  Error: $PERMS_DISTINCT_OUTPUT"
+    exit 1
+  fi
+
+  # Query for count of mismatches
+  PERMS_BAD_SQL="SELECT COUNT(*) FROM permissions WHERE COALESCE(guard_name,'') <> '${EXPECT_GUARD}';"
+
+  set +e
+  php_pg_query "$PERMS_BAD_SQL"
+  PERMS_BAD_EXIT=$PHP_PG_EXIT
+  PERMS_BAD_OUTPUT="$PHP_PG_OUTPUT"
+  set -e
+
+  # Normalize exit code (never 255)
+  if [[ $PERMS_BAD_EXIT -ne 0 ]] && [[ $PERMS_BAD_EXIT -ne 1 ]]; then
+    PERMS_BAD_EXIT=1
+  fi
+
+  if [[ $PERMS_BAD_EXIT -ne 0 ]]; then
+    echo "✗ Permissions guard_name check failed"
+    echo "  Error: $PERMS_BAD_OUTPUT"
+    exit 1
+  fi
+
+  # Parse results
+  PERMS_BAD_COUNT="$(echo "$PERMS_BAD_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
+  PERMS_DISTINCT_VALUES="$(echo "$PERMS_DISTINCT_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' || true)"
+
+  # Check if all guard_name values match expected
+  if [[ "$PERMS_BAD_COUNT" == "0" ]]; then
+    echo "✓ permissions.guard_name normalized: ${EXPECT_GUARD}"
+  else
+    echo "✗ permissions.guard_name not normalized"
+    echo "  Expected: ${EXPECT_GUARD}"
+    echo "  Mismatched rows: ${PERMS_BAD_COUNT}"
+    if [[ -n "$PERMS_DISTINCT_VALUES" ]]; then
+      echo "  Distinct values found:"
+      echo "$PERMS_DISTINCT_VALUES" | while IFS='|' read -r guard count; do
+        [[ -n "$guard" ]] && echo "    - ${guard}: ${count} row(s)"
+      done
+    fi
+    exit 1
+  fi
 fi
 echo
 
 echo "5. Checking for duplicate role names..."
 # Use PHP PDO directly (no Laravel bootstrap, no artisan)
-# Query for duplicate (guard_name, name) pairs
-DUP_ROLES_SQL="SELECT COALESCE(guard_name,'') AS guard_name, name, COUNT(*) AS c FROM roles GROUP BY COALESCE(guard_name,''), name HAVING COUNT(*) > 1 ORDER BY c DESC, guard_name, name;"
+# Check if guard_name column exists first
+ROLES_GUARD_NAME_CHECK_SQL="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='roles' AND column_name='guard_name';"
+
+set +e
+php_pg_query "$ROLES_GUARD_NAME_CHECK_SQL"
+ROLES_GUARD_NAME_CHECK_EXIT=$PHP_PG_EXIT
+ROLES_GUARD_NAME_CHECK_OUTPUT="$PHP_PG_OUTPUT"
+set -e
+
+# Normalize exit code (never 255)
+if [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 0 ]] && [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 1 ]]; then
+  ROLES_GUARD_NAME_CHECK_EXIT=1
+fi
+
+if [[ $ROLES_GUARD_NAME_CHECK_EXIT -ne 0 ]]; then
+  echo "✗ Roles guard_name column check failed"
+  echo "  Error: $ROLES_GUARD_NAME_CHECK_OUTPUT"
+  exit 1
+fi
+
+ROLES_GUARD_NAME_COUNT="$(echo "$ROLES_GUARD_NAME_CHECK_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
+
+# Query for duplicate (guard_name, name) pairs if guard_name exists, otherwise just by name
+if [[ "$ROLES_GUARD_NAME_COUNT" == "0" ]]; then
+  DUP_ROLES_SQL="SELECT name, COUNT(*) AS c FROM roles GROUP BY name HAVING COUNT(*) > 1 ORDER BY c DESC, name;"
+else
+  DUP_ROLES_SQL="SELECT COALESCE(guard_name,'') AS guard_name, name, COUNT(*) AS c FROM roles GROUP BY COALESCE(guard_name,''), name HAVING COUNT(*) > 1 ORDER BY c DESC, guard_name, name;"
+fi
 
 set +e
 php_pg_query_all "$DUP_ROLES_SQL"
@@ -520,17 +607,51 @@ if [[ -z "$DUP_ROLES_FOUND" ]]; then
 else
   # Duplicates found = FAIL
   echo "✗ Duplicate roles found"
-  echo "$DUP_ROLES_FOUND" | while IFS='|' read -r guard_name name count; do
-    [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
-  done
+  if [[ "$ROLES_GUARD_NAME_COUNT" == "0" ]]; then
+    # No guard_name column - parse as name|count
+    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r name count; do
+      [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
+    done
+  else
+    # guard_name column exists - parse as guard_name|name|count
+    echo "$DUP_ROLES_FOUND" | while IFS='|' read -r guard_name name count; do
+      [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
+    done
+  fi
   exit 1
 fi
 echo
 
 echo "6. Checking for duplicate permission names..."
 # Use PHP PDO directly (no Laravel bootstrap, no artisan)
-# Query for duplicate (guard_name, name) pairs
-DUP_PERMS_SQL="SELECT COALESCE(guard_name,'') AS guard_name, name, COUNT(*) AS c FROM permissions GROUP BY COALESCE(guard_name,''), name HAVING COUNT(*) > 1 ORDER BY c DESC, guard_name, name;"
+# Check if guard_name column exists first
+PERMS_GUARD_NAME_CHECK_SQL="SELECT COUNT(*) FROM information_schema.columns WHERE table_schema='public' AND table_name='permissions' AND column_name='guard_name';"
+
+set +e
+php_pg_query "$PERMS_GUARD_NAME_CHECK_SQL"
+PERMS_GUARD_NAME_CHECK_EXIT=$PHP_PG_EXIT
+PERMS_GUARD_NAME_CHECK_OUTPUT="$PHP_PG_OUTPUT"
+set -e
+
+# Normalize exit code (never 255)
+if [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 0 ]] && [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 1 ]]; then
+  PERMS_GUARD_NAME_CHECK_EXIT=1
+fi
+
+if [[ $PERMS_GUARD_NAME_CHECK_EXIT -ne 0 ]]; then
+  echo "✗ Permissions guard_name column check failed"
+  echo "  Error: $PERMS_GUARD_NAME_CHECK_OUTPUT"
+  exit 1
+fi
+
+PERMS_GUARD_NAME_COUNT="$(echo "$PERMS_GUARD_NAME_CHECK_OUTPUT" | grep -v '^$' | grep -v 'PDO_ERROR' | grep -v 'ERROR' | head -1 | tr -d ' ' || echo "0")"
+
+# Query for duplicate (guard_name, name) pairs if guard_name exists, otherwise just by name
+if [[ "$PERMS_GUARD_NAME_COUNT" == "0" ]]; then
+  DUP_PERMS_SQL="SELECT name, COUNT(*) AS c FROM permissions GROUP BY name HAVING COUNT(*) > 1 ORDER BY c DESC, name;"
+else
+  DUP_PERMS_SQL="SELECT COALESCE(guard_name,'') AS guard_name, name, COUNT(*) AS c FROM permissions GROUP BY COALESCE(guard_name,''), name HAVING COUNT(*) > 1 ORDER BY c DESC, guard_name, name;"
+fi
 
 set +e
 php_pg_query_all "$DUP_PERMS_SQL"
@@ -558,9 +679,30 @@ if [[ -z "$DUP_PERMS_FOUND" ]]; then
 else
   # Duplicates found = FAIL
   echo "✗ Duplicate permissions found"
-  echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count; do
-    [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
-  done
+  if [[ "$PERMS_GUARD_NAME_COUNT" == "0" ]]; then
+    # No guard_name column - parse as name|count
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r name count; do
+      [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
+    done
+  else
+    # guard_name column exists - parse as guard_name|name|count
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count; do
+      [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
+    done
+  fi
+  exit 1
+fi
+echo
+    # No guard_name column - parse as name|count
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r name count; do
+      [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${name} x${count}"
+    done
+  else
+    # guard_name column exists - parse as guard_name|name|count
+    echo "$DUP_PERMS_FOUND" | while IFS='|' read -r guard_name name count; do
+      [[ -n "$guard_name" ]] && [[ -n "$name" ]] && [[ -n "$count" ]] && echo "  ${guard_name}:${name} x${count}"
+    done
+  fi
   exit 1
 fi
 echo

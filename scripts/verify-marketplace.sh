@@ -89,7 +89,21 @@ echo "API Base URL: ${API_BASE_URL}"
 echo
 
 TMP_BODY="/tmp/imdc_marketplace_guardrail_body.$$"
-cleanup() { rm -f "$TMP_BODY" 2>/dev/null || true; }
+GUARDRAIL_PRODUCT_ID=""
+GUARDRAIL_RUN_ID=""
+
+cleanup() {
+    rm -f "$TMP_BODY" 2>/dev/null || true
+    # Cleanup seeded guardrail product if it exists
+    if [[ -n "$GUARDRAIL_PRODUCT_ID" ]]; then
+        CLEANUP_SCRIPT="$ROOT_DIR/scripts/_guardrail/cleanup_guardrail_product.php"
+        if [[ -f "$CLEANUP_SCRIPT" ]]; then
+            echo "  Cleaning up guardrail product: ${GUARDRAIL_PRODUCT_ID}"
+            export IMDC_GR_RUN_ID="$GUARDRAIL_RUN_ID"
+            php "$CLEANUP_SCRIPT" "$GUARDRAIL_PRODUCT_ID" "$GUARDRAIL_RUN_ID" 2>/dev/null || true
+        fi
+    fi
+}
 trap cleanup EXIT
 
 curl_http_code() {
@@ -147,20 +161,8 @@ check_and_reset_db() {
     if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
         DB_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${db_name}';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
     else
-        # In container: use PHP/PDO to connect to postgres database
-        DB_EXISTS="$(php artisan tinker --execute="
-            try {
-                \$host = config('database.connections.${domain}.host');
-                \$port = config('database.connections.${domain}.port');
-                \$user = config('database.connections.${domain}.username');
-                \$pass = config('database.connections.${domain}.password');
-                \$pdo = new PDO('pgsql:host=' . \$host . ';port=' . \$port . ';dbname=postgres', \$user, \$pass);
-                \$stmt = \$pdo->query('SELECT 1 FROM pg_database WHERE datname=' . \$pdo->quote('${db_name}'));
-                echo \$stmt->fetchColumn() ? 'yes' : 'no';
-            } catch (Exception \$e) {
-                echo 'no';
-            }
-        " 2>/dev/null | tail -1)"
+        # In container: use PHP helper
+        DB_EXISTS="$(php "$ROOT_DIR/scripts/_guardrail/check_db_exists.php" "${domain}" "${db_name}" 2>/dev/null | tail -1)"
     fi
     set -e
     
@@ -174,14 +176,7 @@ check_and_reset_db() {
     if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
         MIGRATIONS_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d "${db_name}" -tc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='migrations';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
     else
-        MIGRATIONS_EXISTS="$(php artisan tinker --execute="
-            try {
-                \$exists = DB::connection('${domain}')->getSchemaBuilder()->hasTable('migrations');
-                echo \$exists ? 'yes' : 'no';
-            } catch (Exception \$e) {
-                echo 'no';
-            }
-        " 2>/dev/null | tail -1)"
+        MIGRATIONS_EXISTS="$(php "$ROOT_DIR/scripts/_guardrail/check_table_exists.php" "${domain}" "migrations" 2>/dev/null | tail -1)"
     fi
     set -e
     
@@ -192,14 +187,7 @@ check_and_reset_db() {
         if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
             TABLE_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d "${db_name}" -tc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='${table}';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
         else
-            TABLE_EXISTS="$(php artisan tinker --execute="
-                try {
-                    \$exists = DB::connection('${domain}')->getSchemaBuilder()->hasTable('${table}');
-                    echo \$exists ? 'yes' : 'no';
-                } catch (Exception \$e) {
-                    echo 'no';
-                }
-            " 2>/dev/null | tail -1)"
+            TABLE_EXISTS="$(php "$ROOT_DIR/scripts/_guardrail/check_table_exists.php" "${domain}" "${table}" 2>/dev/null | tail -1)"
         fi
         set -e
         
@@ -222,22 +210,8 @@ check_and_reset_db() {
             docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE ${db_name};" >/dev/null 2>&1
             RESET_EXIT=$?
         else
-            # In container: use PHP/PDO to connect to postgres database
-            RESET_OUTPUT="$(php artisan tinker --execute="
-                try {
-                    \$host = config('database.connections.${domain}.host');
-                    \$port = config('database.connections.${domain}.port');
-                    \$user = config('database.connections.${domain}.username');
-                    \$pass = config('database.connections.${domain}.password');
-                    \$pdo = new PDO('pgsql:host=' . \$host . ';port=' . \$port . ';dbname=postgres', \$user, \$pass);
-                    \$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-                    \$pdo->exec('DROP DATABASE IF EXISTS ${db_name} WITH (FORCE)');
-                    \$pdo->exec('CREATE DATABASE ${db_name}');
-                    echo 'ok';
-                } catch (Exception \$e) {
-                    echo 'failed: ' . \$e->getMessage();
-                }
-            " 2>/dev/null | tail -1)"
+            # In container: use PHP helper
+            RESET_OUTPUT="$(php "$ROOT_DIR/scripts/_guardrail/reset_database.php" "${domain}" "${db_name}" 2>/dev/null | tail -1)"
             if [[ "$RESET_OUTPUT" == "ok" ]]; then
                 RESET_EXIT=0
             else
@@ -370,24 +344,7 @@ echo
 # Test 1: Check key tables exist
 echo "Test 1: Checking key tables exist..."
 set +e
-TABLES_CHECK="$(php artisan tinker --execute="
-use Illuminate\Support\Facades\DB;
-\$tables = [
-    'products' => 'products',
-    'orders' => 'orders',
-    'order_items' => 'orders',
-    'inventory_items' => 'inventory',
-    'inventory_reservations' => 'inventory',
-    'accounting_vouchers' => 'core',
-    'accounting_ledger' => 'core',
-];
-\$results = [];
-foreach (\$tables as \$table => \$conn) {
-    \$exists = DB::connection(\$conn)->getSchemaBuilder()->hasTable(\$table);
-    \$results[\$table] = \$exists ? 'EXISTS' : 'MISSING';
-}
-echo json_encode(\$results);
-" 2>&1)"
+TABLES_CHECK="$(php "$ROOT_DIR/scripts/_guardrail/check_tables_exist.php" 2>&1)"
 set -e
 
 if echo "$TABLES_CHECK" | grep -q "MISSING"; then
@@ -398,16 +355,22 @@ fi
 echo "✓ All key tables exist"
 echo
 
-# Test 2: Mint token
+# Test 2: Mint token (use Admin role user via Spatie, fallback to first user)
 echo "Test 2: Minting authentication token..."
 set +e
-TOKEN="$(php artisan imdc:mint-debug-token --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
+TOKEN_OUTPUT="$(php "$ROOT_DIR/scripts/_guardrail/mint_token_admin.php" 2>&1)"
 TOKEN_EXIT=$?
 set -e
 
-if [ $TOKEN_EXIT -ne 0 ] || [ -z "$TOKEN" ]; then
+if [ $TOKEN_EXIT -ne 0 ]; then
     echo "✗ Token mint failed"
-    echo "  ERROR: Failed to mint token on core connection. Check that users table exists in core DB."
+    echo "$TOKEN_OUTPUT" | grep -E "ERROR|Exception" | head -5 || echo "  ERROR: Failed to mint token on core connection."
+    exit 1
+fi
+
+TOKEN="$(echo "$TOKEN_OUTPUT" | tail -1 | tr -d "\r\n")"
+if [ -z "$TOKEN" ]; then
+    echo "✗ Token mint failed: empty token"
     exit 1
 fi
 
@@ -435,7 +398,7 @@ else
     
     # Current DB connection resolved for products
     echo "Products DB connection config:"
-    php artisan tinker --execute="echo '  Host: ' . config('database.connections.products.host') . PHP_EOL; echo '  Database: ' . config('database.connections.products.database') . PHP_EOL; echo '  Connection name: products' . PHP_EOL;" 2>/dev/null || echo "  (config check failed)"
+    php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); echo '  Host: ' . config('database.connections.products.host') . PHP_EOL; echo '  Database: ' . config('database.connections.products.database') . PHP_EOL; echo '  Connection name: products' . PHP_EOL;" 2>/dev/null || echo "  (config check failed)"
     echo
     
     # Laravel exception stacktrace (last ~200 lines)
@@ -478,61 +441,61 @@ echo
 # Test 5: Idempotency test for order creation
 echo "Test 5: Testing order creation idempotency..."
 
-# Get a real product_id from GET /api/v1/products
-echo "  Fetching available product from API..."
+# Ensure guardrail product exists (deterministic - never skip)
+echo "  Ensuring guardrail product exists..."
+ENSURE_SCRIPT="$ROOT_DIR/scripts/_guardrail/ensure_guardrail_product.php"
+if [[ ! -f "$ENSURE_SCRIPT" ]]; then
+    echo "  ✗ Guardrail helper script not found: $ENSURE_SCRIPT"
+    exit 1
+fi
+
 set +e
-PRODUCTS_RESPONSE="$(curl_http_code "${API_BASE_URL}/api/v1/products" "$TOKEN")"
-PRODUCTS_BODY="$(cat "$TMP_BODY" 2>/dev/null || echo '{}')"
+# Capture STDOUT (product ID) and STDERR (diagnostics) separately using temp files
+ENSURE_STDOUT_TMP="/tmp/imdc_ensure_stdout.$$"
+ENSURE_STDERR_TMP="/tmp/imdc_ensure_stderr.$$"
+php "$ENSURE_SCRIPT" > "$ENSURE_STDOUT_TMP" 2> "$ENSURE_STDERR_TMP"
+ENSURE_EXIT=$?
 set -e
 
-if [[ "${PRODUCTS_RESPONSE}" != "200" ]]; then
-    echo "  ⚠ Could not fetch products (HTTP ${PRODUCTS_RESPONSE})"
-    echo "  ⚠ Skipping idempotency test"
-    echo
-    echo "=== Marketplace Guardrail PASSED ==="
-    exit 0
+if [[ $ENSURE_EXIT -ne 0 ]]; then
+    echo "  ✗ Failed to ensure guardrail product:"
+    head -10 "$ENSURE_STDERR_TMP" 2>/dev/null || true
+    rm -f "$ENSURE_STDOUT_TMP" "$ENSURE_STDERR_TMP" 2>/dev/null || true
+    exit 1
 fi
 
-# Extract first product ID from response using POSIX tools (grep/sed) - stable and no dependencies
-# JSON structure: {"data":{"data":[{"id":"...",...}]}}
-TEST_PRODUCT_ID="$(echo "$PRODUCTS_BODY" | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"\([^"]*\)"/\1/' || echo '')"
+# Extract product ID from STDOUT (machine-parseable, should be only the UUID)
+TEST_PRODUCT_ID="$(cat "$ENSURE_STDOUT_TMP" 2>/dev/null | tail -1 | tr -d '\r\n')"
+
+# Extract run_id from stderr (RUN_ID: <uuid>)
+GUARDRAIL_RUN_ID="$(grep -E 'RUN_ID:' "$ENSURE_STDERR_TMP" 2>/dev/null | sed -n 's/.*RUN_ID:[[:space:]]*\([^[:space:]]*\).*/\1/p' | head -1 || echo '')"
+
+# Check if this is a newly created guardrail product (for cleanup)
+if grep -q "Created product for idempotency test" "$ENSURE_STDERR_TMP" 2>/dev/null; then
+    GUARDRAIL_PRODUCT_ID="$TEST_PRODUCT_ID"
+    export IMDC_GR_RUN_ID="$GUARDRAIL_RUN_ID"
+fi
+
+# Cleanup temp files
+rm -f "$ENSURE_STDOUT_TMP" "$ENSURE_STDERR_TMP" 2>/dev/null || true
 
 if [[ -z "$TEST_PRODUCT_ID" ]]; then
-    echo "  ⚠ No products found in response"
-    echo "  ⚠ Skipping idempotency test"
-    echo
-    echo "=== Marketplace Guardrail PASSED ==="
-    exit 0
+    echo "  ✗ Failed to extract product ID from ensure output"
+    exit 1
 fi
 
-echo "  Using product ID: ${TEST_PRODUCT_ID}"
+echo "  ✓ Using product ID: ${TEST_PRODUCT_ID}"
 
 # Ensure inventory exists for the product
 echo "  Ensuring inventory availability..."
 set +e
-INVENTORY_SETUP="$(php artisan tinker --execute="
-try {
-    \$item = \App\Inventory\Models\InventoryItem::firstOrCreate(
-        ['product_id' => '${TEST_PRODUCT_ID}'],
-        ['available_quantity' => 100, 'reserved_quantity' => 0]
-    );
-    if (\$item->available_quantity < 10) {
-        \$item->available_quantity = 100;
-        \$item->save();
-    }
-    echo 'ok';
-} catch (Exception \$e) {
-    echo 'failed: ' . \$e->getMessage();
-}
-" 2>/dev/null | tail -1)"
+INVENTORY_SETUP="$(php "$ROOT_DIR/scripts/_guardrail/ensure_inventory.php" "${TEST_PRODUCT_ID}" 2>/dev/null | tail -1)"
 set -e
 
 if [[ "$INVENTORY_SETUP" != "ok" ]]; then
-    echo "  ⚠ Could not setup inventory: ${INVENTORY_SETUP}"
-    echo "  ⚠ Skipping idempotency test"
-    echo
-    echo "=== Marketplace Guardrail PASSED ==="
-    exit 0
+    echo "  ✗ Could not setup inventory: ${INVENTORY_SETUP}"
+    echo "  ✗ Idempotency test cannot proceed without inventory"
+    exit 1
 fi
 
 IDEMPOTENCY_KEY="test-$(date +%s)-$$"

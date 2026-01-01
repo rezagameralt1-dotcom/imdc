@@ -50,6 +50,11 @@ final class CoreRbacSeeder extends Seeder
 
             // DID permissions
             ['name' => 'did.manage.self',  'description' => 'Manage own DID profile'],
+
+            // Linking permissions
+            ['name' => 'linking.create',   'description' => 'Create entity links'],
+            ['name' => 'linking.read',     'description' => 'Read entity links'],
+            ['name' => 'linking.admin',    'description' => 'Admin linking operations'],
         ];
 
         foreach ($permissions as $p) {
@@ -95,6 +100,7 @@ final class CoreRbacSeeder extends Seeder
             'products.view', 'products.create', 'products.update',
             'nft.mint', 'nft.transfer', 'nft.read',
             'did.manage.self',
+            'linking.create', 'linking.read', 'linking.admin',
         ]);
 
         $attach($managerRoleId, [

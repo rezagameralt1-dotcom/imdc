@@ -76,19 +76,39 @@ echo
 
 # Check 3: NFT guardrail (if FEATURE_NFT enabled)
 echo "Check 3: NFT guardrail (if FEATURE_NFT enabled)..."
-if [[ "${FEATURE_NFT:-false}" == "true" ]]; then
+# Read FEATURE_NFT from .env file (deterministic detection)
+ENV_FILE="${ROOT_DIR}/.env"
+FEATURE_NFT_ENABLED=false
+if [[ -f "$ENV_FILE" ]]; then
+    # Read FEATURE_NFT from .env file (before any modifications)
+    FEATURE_NFT_FROM_ENV="$(grep -E "^FEATURE_NFT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    # Normalize: check if it's explicitly set to true
+    if [[ -n "$FEATURE_NFT_FROM_ENV" ]]; then
+        FEATURE_NFT_NORMALIZED="$(echo "$FEATURE_NFT_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_NFT_NORMALIZED" == "true" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "1" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "yes" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "on" ]]; then
+            FEATURE_NFT_ENABLED=true
+        fi
+    fi
+else
+    # If .env doesn't exist, fall back to shell env (default: false)
+    if [[ "${FEATURE_NFT:-false}" == "true" ]]; then
+        FEATURE_NFT_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_NFT_ENABLED" == "true" ]]; then
     if [[ -f "$SCRIPT_DIR/verify-nft.sh" ]]; then
         NFT_EXIT=0
         if is_container "${1:-}"; then
             # Running inside container: execute directly
             cd /var/www/html || exit 1
-            FEATURE_NFT=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-nft.sh --in-container > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
+            IMDC_API_BASE_URL=http://web:80 ./scripts/verify-nft.sh --in-container > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
         elif has_docker_compose; then
             # Running on host: use docker compose
-            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_NFT=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-nft.sh --in-container" > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-nft.sh --in-container" > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
         else
             # No docker compose: try direct execution
-            FEATURE_NFT=true "$SCRIPT_DIR/verify-nft.sh" > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
+            "$SCRIPT_DIR/verify-nft.sh" > /tmp/nft_guardrail_output.txt 2>&1 || NFT_EXIT=$?
         fi
         
         if [[ $NFT_EXIT -eq 0 ]]; then
@@ -107,13 +127,58 @@ if [[ "${FEATURE_NFT:-false}" == "true" ]]; then
         ERRORS=$((ERRORS + 1))
     fi
 else
-    echo "  SKIPPED: FEATURE_NFT is not enabled (FEATURE_NFT=${FEATURE_NFT:-false})"
+    echo "  SKIPPED: FEATURE_NFT is not enabled (FEATURE_NFT=${FEATURE_NFT_FROM_ENV:-${FEATURE_NFT:-false}})"
 fi
 echo
-  # Check 3.5: DID guardrail (disabled: Check 4 runs DID deterministically)
-  echo "Check 3.5: DID guardrail (if FEATURE_DID enabled)..."
-  echo "  SKIPPED: Check 4 runs DID guardrail deterministically"
-  echo
+
+# Check 3.5: Linking guardrail (if FEATURE_LINKING enabled)
+echo "Check 3.5: Linking guardrail (if FEATURE_LINKING enabled)..."
+FEATURE_LINKING_ENABLED=false
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_LINKING_FROM_ENV="$(grep -E "^FEATURE_LINKING=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_LINKING_FROM_ENV" ]]; then
+        FEATURE_LINKING_NORMALIZED="$(echo "$FEATURE_LINKING_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_LINKING_NORMALIZED" == "true" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "1" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "yes" ]] || [[ "$FEATURE_LINKING_NORMALIZED" == "on" ]]; then
+            FEATURE_LINKING_ENABLED=true
+        fi
+    fi
+else
+    if [[ "${FEATURE_LINKING:-false}" == "true" ]]; then
+        FEATURE_LINKING_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_LINKING_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-linking.sh" ]]; then
+        LINKING_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            IMDC_API_BASE_URL=http://web:80 ./scripts/verify-linking.sh --in-container > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-linking.sh --in-container" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+        else
+            "$SCRIPT_DIR/verify-linking.sh" > /tmp/linking_guardrail_output.txt 2>&1 || LINKING_EXIT=$?
+        fi
+        
+        if [[ $LINKING_EXIT -eq 0 ]]; then
+            if grep -q "All linking tests PASSED" /tmp/linking_guardrail_output.txt; then
+                echo "✓ Linking guardrail PASSED"
+            else
+                echo "✗ Linking guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Linking guardrail execution failed (exit code: $LINKING_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-linking.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_LINKING is not enabled (FEATURE_LINKING=${FEATURE_LINKING_FROM_ENV:-${FEATURE_LINKING:-false}})"
+fi
+echo
 
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."

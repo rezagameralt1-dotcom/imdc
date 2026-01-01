@@ -27,6 +27,39 @@ class NftController extends ApiController
             $this->authorize('mint', NftToken::class);
 
             $data = $request->validated();
+            $idempotencyKey = $data['idempotency_key'] ?? null;
+            $userId = $request->user()->id;
+
+            // Check for existing idempotency record FIRST (before any side-effects)
+            if ($idempotencyKey) {
+                $idempotencyKey = substr(trim($idempotencyKey), 0, 128);
+                $requestHash = $this->hashMintRequest($data);
+
+                $existingIdempotency = IdempotencyKey::where('user_id', $userId)
+                    ->where('scope', 'nfts.mint')
+                    ->where('key', $idempotencyKey)
+                    ->first();
+
+                if ($existingIdempotency) {
+                    // Verify request hash matches (same payload)
+                    if ($existingIdempotency->request_hash !== $requestHash) {
+                        return $this->errorResponse(
+                            'Idempotency key already used with different payload',
+                            409,
+                            ['fields' => ['idempotency_key' => ['Idempotency key already used with different request payload']]]
+                        );
+                    }
+
+                    // Return stored response with HTTP 200 (force 200 on replay)
+                    $responseBody = json_decode($existingIdempotency->response_body, true);
+                    if (is_array($responseBody)) {
+                        $responseBody['trace_id'] = $this->traceId();
+                    }
+                    return response()->json($responseBody, 200);
+                }
+            }
+
+            // No existing idempotency record, proceed with mint
             $token = $this->mintService->mint(
                 $data['contract'],
                 $data['token_id'],
@@ -34,7 +67,46 @@ class NftController extends ApiController
                 $data['metadata_uri'] ?? null
             );
 
-            return $this->successResponse($token, 201);
+            // Build response
+            $response = $this->successResponse($token, 201);
+
+            // Store idempotency record if key is present
+            if ($idempotencyKey) {
+                $requestHash = $this->hashMintRequest($data);
+                $responseArray = $response->getData(true);
+                $responseBody = json_encode($responseArray);
+
+                try {
+                    IdempotencyKey::create([
+                        'user_id' => $userId,
+                        'scope' => 'nfts.mint',
+                        'key' => $idempotencyKey,
+                        'request_hash' => $requestHash,
+                        'response_code' => 201,
+                        'response_body' => $responseBody,
+                        'resource_id' => $token->id,
+                    ]);
+                } catch (\Illuminate\Database\QueryException $e) {
+                    // Handle unique constraint violation (race condition)
+                    if ($e->getCode() === '23000' || str_contains($e->getMessage(), '23000') || 
+                        $e->getCode() === '23505' || str_contains($e->getMessage(), '23505')) {
+                        // Fetch the existing record and return its stored response
+                        $existingIdempotency = IdempotencyKey::where('user_id', $userId)
+                            ->where('scope', 'nfts.mint')
+                            ->where('key', $idempotencyKey)
+                            ->first();
+
+                        if ($existingIdempotency && $existingIdempotency->request_hash === $requestHash) {
+                            $storedResponse = json_decode($existingIdempotency->response_body, true);
+                            return response()->json($storedResponse, 200);
+                        }
+                    }
+                    // Re-throw if it's not a unique constraint or hash mismatch
+                    throw $e;
+                }
+            }
+
+            return $response;
         } catch (ValidationException $e) {
             return $this->errorResponse(
                 'Validation failed',
@@ -53,9 +125,12 @@ class NftController extends ApiController
     public function transfer(TransferNftRequest $request)
     {
         try {
-            $this->authorize('transfer', NftToken::class);
-
             $data = $request->validated();
+            $token = NftToken::findOrFail($data['token_uuid']);
+            
+            // Authorize: only owner can transfer (or Admin)
+            $this->authorize('transfer', $token);
+
             $idempotencyKey = $data['idempotency_key'] ?? null;
             $userId = $request->user()->id;
 
@@ -187,7 +262,7 @@ class NftController extends ApiController
     }
 
     /**
-     * Hash request payload for idempotency validation
+     * Hash request payload for idempotency validation (transfer)
      */
     private function hashRequest(array $data): string
     {
@@ -195,6 +270,22 @@ class NftController extends ApiController
         $normalized = [
             'token_uuid' => $data['token_uuid'] ?? null,
             'to_user_id' => $data['to_user_id'] ?? null,
+        ];
+        ksort($normalized);
+        return hash('sha256', json_encode($normalized));
+    }
+
+    /**
+     * Hash request payload for idempotency validation (mint)
+     */
+    private function hashMintRequest(array $data): string
+    {
+        // Normalize data for hashing (exclude idempotency_key itself)
+        $normalized = [
+            'contract' => $data['contract'] ?? null,
+            'token_id' => $data['token_id'] ?? null,
+            'owner_user_id' => $data['owner_user_id'] ?? null,
+            'metadata_uri' => $data['metadata_uri'] ?? null,
         ];
         ksort($normalized);
         return hash('sha256', json_encode($normalized));

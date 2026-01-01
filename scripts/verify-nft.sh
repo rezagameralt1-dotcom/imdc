@@ -36,11 +36,89 @@ echo
 echo "Execution context: ${EXEC_CTX}"
 echo
 
-# Check FEATURE_NFT flag
-if [[ "${FEATURE_NFT:-false}" != "true" ]]; then
-    echo "FEATURE_NFT is not enabled (FEATURE_NFT=${FEATURE_NFT:-false})"
+# Check original .env state to determine if we should skip
+ENV_FILE="${ROOT_DIR}/.env"
+SHOULD_SKIP=false
+
+if [[ -f "$ENV_FILE" ]]; then
+    # Read FEATURE_NFT from .env file (before any modifications)
+    FEATURE_NFT_FROM_ENV="$(grep -E "^FEATURE_NFT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    # Normalize: check if it's explicitly set to false (case-insensitive)
+    if [[ -n "$FEATURE_NFT_FROM_ENV" ]]; then
+        FEATURE_NFT_NORMALIZED="$(echo "$FEATURE_NFT_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_NFT_NORMALIZED" == "false" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "0" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "no" ]] || [[ "$FEATURE_NFT_NORMALIZED" == "off" ]]; then
+            SHOULD_SKIP=true
+        fi
+    fi
+    # If FEATURE_NFT is missing from .env, we'll proceed and add it (don't skip)
+else
+    # If .env doesn't exist, check shell env (default behavior: skip if not explicitly true)
+    if [[ "${FEATURE_NFT:-false}" != "true" ]]; then
+        SHOULD_SKIP=true
+    fi
+fi
+
+if [[ "$SHOULD_SKIP" == "true" ]]; then
+    echo "FEATURE_NFT is not enabled (FEATURE_NFT=${FEATURE_NFT_FROM_ENV:-${FEATURE_NFT:-false}})"
     echo "SKIPPED: NFT verification"
     exit 0
+fi
+
+# Guardrail: Temporarily ensure FEATURE_NFT=true for the duration of the script
+echo "Guardrail: Temporarily ensuring FEATURE_NFT=true for verification..."
+echo
+
+# Export FEATURE_NFT=true for all child processes (artisan, curl, etc.)
+export FEATURE_NFT=true
+
+# Backup and modify .env file so php-fpm workers can read FEATURE_NFT=true
+ENV_BACKUP=""
+
+# Initialize cleanup function early (before .env modification)
+TMP_BODY="/tmp/imdc_nft_guardrail_body.$$"
+cleanup() {
+    rm -f "$TMP_BODY" 2>/dev/null || true
+    # Restore .env if it was backed up
+    if [[ -n "$ENV_BACKUP" ]] && [[ -f "$ENV_BACKUP" ]] && [[ -n "$ENV_FILE" ]]; then
+        echo "Restoring original .env file..."
+        if [[ -f "$ENV_FILE" ]]; then
+            mv "$ENV_BACKUP" "$ENV_FILE" 2>/dev/null || true
+            # Clear caches after restore
+            php artisan config:clear 2>/dev/null || true
+            php artisan cache:clear 2>/dev/null || true
+            php artisan route:clear 2>/dev/null || true
+        fi
+    fi
+}
+trap cleanup EXIT
+
+if [[ -f "$ENV_FILE" ]]; then
+    TIMESTAMP="$(date +%s)"
+    ENV_BACKUP="${ENV_FILE}.bak.verify-nft.${TIMESTAMP}"
+    cp -a "$ENV_FILE" "$ENV_BACKUP"
+    echo "  ✓ Backed up .env to ${ENV_BACKUP}"
+
+    # Ensure FEATURE_NFT=true is set in .env
+    if grep -qE "^FEATURE_NFT=" "$ENV_FILE" 2>/dev/null; then
+        # Replace existing line
+        if [[ "$(uname)" == "Darwin" ]]; then
+            # macOS sed
+            sed -i '' 's/^FEATURE_NFT=.*/FEATURE_NFT=true/' "$ENV_FILE"
+        else
+            # Linux sed
+            sed -i 's/^FEATURE_NFT=.*/FEATURE_NFT=true/' "$ENV_FILE"
+        fi
+        echo "  ✓ Updated FEATURE_NFT=true in .env"
+    else
+        # Append if not exists
+        echo "FEATURE_NFT=true" >> "$ENV_FILE"
+        echo "  ✓ Added FEATURE_NFT=true to .env"
+    fi
+else
+    echo "  ⚠ .env file not found at ${ENV_FILE}"
+    echo "  Guardrail will attempt to run with exported FEATURE_NFT=true"
+    echo "  Note: php-fpm workers may not see the env variable without .env file"
+    echo
 fi
 
 # Determine API base URL
@@ -55,9 +133,29 @@ fi
 echo "API Base URL: ${API_BASE_URL}"
 echo
 
-TMP_BODY="/tmp/imdc_nft_guardrail_body.$$"
-cleanup() { rm -f "$TMP_BODY" 2>/dev/null || true; }
-trap cleanup EXIT
+# Pre-flight: Clear caches to ensure FEATURE_NFT from .env is read at runtime
+echo "Pre-flight: Clearing caches to ensure FEATURE_NFT from .env is read at runtime..."
+echo
+set +e
+php artisan config:clear 2>/dev/null || true
+php artisan cache:clear 2>/dev/null || true
+php artisan route:clear 2>/dev/null || true
+set -e
+echo "    ✓ Caches cleared (config, cache, route)"
+echo
+
+# Debug: Show effective FEATURE_NFT value from .env
+echo "Debug: Verifying FEATURE_NFT is enabled..."
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_NFT_FROM_ENV_AFTER="$(grep -E "^FEATURE_NFT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
+    echo "  FEATURE_NFT from .env: ${FEATURE_NFT_FROM_ENV_AFTER}"
+    if [[ "$FEATURE_NFT_FROM_ENV_AFTER" != "true" ]]; then
+        echo "  ⚠ WARNING: FEATURE_NFT in .env is not 'true'"
+    fi
+else
+    echo "  .env file not found - using exported FEATURE_NFT=${FEATURE_NFT:-not set}"
+fi
+echo
 
 curl_http_code() {
     local url="$1"
@@ -201,13 +299,14 @@ if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
 else
     # In container or no docker compose: use PHP/PDO
     # Use clean SQL without backslash escaping
-    DB_CHECK_OUTPUT="$(php artisan tinker --execute="
+    # Use PHP helper for database check (create if needed)
+    DB_CHECK_OUTPUT="$(php -r "
     try {
         \$conn = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}');
-        \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname='${DB_NAME}'\");
+        \$stmt = \$conn->query('SELECT 1 FROM pg_database WHERE datname=' . \$conn->quote('${DB_NAME}'));
         \$exists = \$stmt->fetch() !== false;
         if (!\$exists) {
-            \$conn->exec(\"CREATE DATABASE ${DB_NAME}\");
+            \$conn->exec('CREATE DATABASE ${DB_NAME}');
             echo 'created';
         } else {
             echo 'exists';
@@ -374,17 +473,7 @@ echo
 # Create second user for transfer test
 echo "Test 3: Creating second user for transfer test..."
 set +e
-SECOND_USER_ID="$(php artisan tinker --execute="
-try {
-    \$user = \App\Models\User::firstOrCreate(
-        ['email' => 'nft-test-user-' . time() . '@test.local'],
-        ['name' => 'NFT Test User', 'password' => bcrypt('test123')]
-    );
-    echo \$user->id;
-} catch (Exception \$e) {
-    echo 'failed: ' . \$e->getMessage();
-}
-" 2>/dev/null | tail -1)"
+SECOND_USER_ID="$(php "$ROOT_DIR/scripts/_guardrail/create_test_user.php" 2>/dev/null | tail -1)"
 set -e
 
 if [[ -z "$SECOND_USER_ID" ]] || [[ "$SECOND_USER_ID" == *"failed"* ]]; then
@@ -419,6 +508,12 @@ if [[ -z "$TOKEN_UUID" ]]; then
 fi
 
 echo "✓ NFT token minted: ${TOKEN_UUID}"
+echo
+
+# Ensure distinct occurred_at seconds for WORM chain determinism
+# Sleep 1 second to guarantee mint and transfer have different occurred_at timestamps
+echo "  (Ensuring distinct WORM timestamps: sleeping 1 second...)"
+sleep 1
 echo
 
 # Test 5: Transfer NFT token
@@ -480,14 +575,7 @@ echo
 # Test 7: Verify WORM log chain
 echo "Test 7: Verifying WORM log chain..."
 set +e
-WORM_LOGS_COUNT="$(php artisan tinker --execute="
-try {
-    \$count = \App\Nfts\Models\WormLog::count();
-    echo \$count;
-} catch (Exception \$e) {
-    echo 'failed: ' . \$e->getMessage();
-}
-" 2>/dev/null | tail -1)"
+WORM_LOGS_COUNT="$(php "$ROOT_DIR/scripts/_guardrail/count_worm_logs.php" 2>/dev/null | tail -1)"
 set -e
 
 if [[ -z "$WORM_LOGS_COUNT" ]] || [[ "$WORM_LOGS_COUNT" == *"failed"* ]]; then

@@ -9,28 +9,31 @@ namespace App\Support\Worm;
  * Both writer and verifier MUST use this exact specification.
  * 
  * CANONICAL HASH INPUT SPECIFICATION:
- * 1. Field order (EXACT, matching DB columns):
- *    - id
- *    - prev_hash
- *    - event_type
- *    - entity_type
- *    - entity_id
- *    - payload_json (canonical JSON string)
- *    - created_at (UTC seconds string: "Y-m-d H:i:s")
+ * 1. Hash input format (delimiter-joined string):
+ *    prev_hash + "\n" + event_type + "\n" + occurred_at + "\n" + payload_canonical_json
+ *    - prev_hash: empty string "" for first log, previous log's hash for subsequent logs
+ *    - event_type: event type string (e.g., "mint", "transfer")
+ *    - occurred_at: ISO8601 UTC with seconds precision: "2026-01-01T21:24:57Z"
+ *    - payload_canonical_json: canonical JSON string (normalized types, sorted keys)
  * 
  * 2. JSON Canonicalization Rules:
  *    - Associative arrays (objects): sort keys recursively (ksort)
  *    - List arrays: preserve order, canonicalize elements recursively
- *    - Scalars: preserve types (numbers stay numeric)
+ *    - Scalars: normalize numeric strings to integers (e.g., "54" -> 54), preserve other types
  *    - Encoding flags: JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
  *    - NO JSON_SORT_KEYS at top-level (order enforced by insertion)
  * 
  * 3. Timestamp Canonicalization:
- *    - Format: "Y-m-d H:i:s" (UTC, seconds precision only)
+ *    - Format: ISO8601 UTC with seconds precision: "2026-01-01T21:24:57Z"
  *    - Microseconds are TRUNCATED (not rounded)
  *    - Empty/invalid input => empty string
  * 
- * 4. Hash Algorithm: SHA-256 (hex output)
+ * 4. prev_hash Chaining Rules:
+ *    - First log in chain: prev_hash must be empty string ""
+ *    - Subsequent logs: prev_hash must equal previous log's hash
+ *    - Writer sets prev_hash BEFORE computing hash
+ * 
+ * 5. Hash Algorithm: SHA-256 (hex output, lowercase)
  */
 class WormHasher
 {
@@ -40,47 +43,34 @@ class WormHasher
      * This is the SINGLE SOURCE OF TRUTH for WORM hash computation.
      * Both writer and verifier MUST use this method with identical inputs.
      * 
-     * @param array $fields Fields matching DB columns: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
-     * @return string SHA-256 hex hash
+     * HASH INPUT FORMAT (delimiter-joined string):
+     * prev_hash + "\n" + event_type + "\n" + occurred_at + "\n" + payload_canonical_json
+     * 
+     * @param array $fields Fields: prev_hash, event_type, occurred_at, payload_json
+     * @return string SHA-256 hex hash (lowercase)
      */
     public static function compute(array $fields): string
     {
-        // Extract fields matching DB columns: id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
-        $id = $fields['id'] ?? '';
+        // Extract fields for hash input (delimiter-joined format)
         $prevHash = $fields['prev_hash'] ?? '';
         $eventType = $fields['event_type'] ?? $fields['action'] ?? '';
-        $entityType = $fields['entity_type'] ?? '';
-        $entityId = $fields['entity_id'] ?? '';
-        $payload = $fields['payload_json'] ?? $fields['payload'] ?? [];
         $occurredAt = $fields['occurred_at'] ?? $fields['created_at'] ?? '';
+        $payload = $fields['payload_json'] ?? $fields['payload'] ?? [];
 
         // Canonicalize payload_json: returns canonical JSON string
-        // Rules: sort keys for objects, preserve order for arrays, recursive
+        // Rules: sort keys for objects, preserve order for arrays, recursive, normalize numeric types
         $canonicalPayloadJson = self::canonicalizePayload($payload);
 
-        // Normalize created_at to UTC seconds string: "Y-m-d H:i:s" (truncate microseconds)
-        $createdAtNormalized = self::normalizeTimestamp($occurredAt);
+        // Normalize occurred_at to ISO8601 UTC with seconds precision: "2026-01-01T21:24:57Z"
+        $occurredAtNormalized = self::normalizeTimestamp($occurredAt);
 
-        // Build canonical JSON object with fields in EXACT order (matching DB columns):
-        // id, prev_hash, event_type, entity_type, entity_id, payload_json, created_at
-        // Note: PHP 7.2+ preserves insertion order in JSON objects
-        $canonicalObject = [
-            'id' => (string) $id,
-            'prev_hash' => (string) $prevHash,
-            'event_type' => (string) $eventType,
-            'entity_type' => (string) $entityType,
-            'entity_id' => (string) $entityId,
-            'payload_json' => $canonicalPayloadJson, // Canonical JSON string (not object)
-            'created_at' => $createdAtNormalized,
-        ];
+        // Build canonical hash input string (delimiter-joined format):
+        // prev_hash + "\n" + event_type + "\n" + occurred_at + "\n" + payload_canonical_json
+        // This ensures deterministic ordering and avoids JSON object key ordering issues
+        $canonicalHashInput = $prevHash . "\n" . $eventType . "\n" . $occurredAtNormalized . "\n" . $canonicalPayloadJson;
 
-        // Encode to canonical JSON string (no whitespace, preserves insertion order in PHP 7.2+)
-        // JSON_PRESERVE_ZERO_FRACTION = 1024
-        // Do NOT use JSON_SORT_KEYS (64) on top-level to preserve exact field order
-        $canonicalJson = json_encode($canonicalObject, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES | 1024);
-
-        // Compute SHA-256 hash
-        return hash('sha256', $canonicalJson);
+        // Compute SHA-256 hash (hex, lowercase)
+        return hash('sha256', $canonicalHashInput);
     }
 
     /**
@@ -89,7 +79,7 @@ class WormHasher
      * CANONICALIZATION RULES:
      * - Associative arrays (objects): sort keys recursively (ksort)
      * - List arrays: preserve order, canonicalize elements recursively
-     * - Scalars: preserve types (numbers stay numeric)
+     * - Scalars: normalize numeric strings to integers, preserve other types
      * - Encoding: JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION
      * 
      * @param mixed $payload Can be array, JSON string, or null
@@ -131,7 +121,7 @@ class WormHasher
      * 
      * - Associative arrays (objects): sort keys (ksort), canonicalize values
      * - List arrays: preserve order, canonicalize each element
-     * - Scalars: return as-is
+     * - Scalars: normalize numeric strings to integers, preserve other types
      * 
      * @param mixed $value
      * @return mixed Canonicalized value
@@ -139,6 +129,18 @@ class WormHasher
     private static function canonicalizeValue($value)
     {
         if (!is_array($value)) {
+            // Normalize numeric strings to integers (deterministic type normalization)
+            // This ensures "54" (string) and 54 (int) both become 54 (int) in canonical form
+            if (is_string($value) && is_numeric($value) && !str_contains($value, '.')) {
+                // Integer string: convert to int
+                $intVal = (int) $value;
+                // Verify conversion is lossless (no precision loss)
+                if ((string) $intVal === $value) {
+                    return $intVal;
+                }
+            }
+            // Float strings are preserved as-is (not normalized to avoid precision issues)
+            // UUIDs and other non-numeric strings are preserved as-is
             return $value;
         }
 
@@ -178,15 +180,15 @@ class WormHasher
     }
 
     /**
-     * Normalize timestamp to UTC seconds string format (LOCKED SPEC).
+     * Normalize timestamp to ISO8601 UTC format with seconds precision (LOCKED SPEC).
      * 
      * CANONICALIZATION RULES:
-     * - Format: "Y-m-d H:i:s" (UTC, seconds precision only)
+     * - Format: ISO8601 UTC with seconds precision: "2026-01-01T21:24:57Z"
      * - Microseconds are TRUNCATED (not rounded)
      * - Empty/invalid input => empty string
      * 
      * @param mixed $timestamp Can be Carbon instance, DateTime, or string
-     * @return string Format: "Y-m-d H:i:s" (UTC, no timezone suffix, no microseconds)
+     * @return string Format: "2026-01-01T21:24:57Z" (ISO8601 UTC, seconds precision)
      */
     private static function normalizeTimestamp($timestamp): string
     {
@@ -203,13 +205,17 @@ class WormHasher
                 $dt = clone $timestamp;
                 $dt->setTimezone(new \DateTimeZone('UTC'));
             } elseif (is_string($timestamp)) {
-                // If already in 'Y-m-d H:i:s' format (no microseconds), assume UTC
-                if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $timestamp)) {
+                // If already in ISO8601 format with Z, check format
+                if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/', $timestamp)) {
                     return $timestamp;
                 }
                 // If contains microseconds, truncate (not round)
-                if (preg_match('/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(\.\d+)?/', $timestamp, $matches)) {
-                    return $matches[1]; // Return seconds part only (truncate microseconds)
+                if (preg_match('/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})Z?/', $timestamp, $matches)) {
+                    return $matches[1] . 'Z'; // Return seconds part with Z suffix
+                }
+                // If in 'Y-m-d H:i:s' format, convert to ISO8601
+                if (preg_match('/^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(\.\d+)?/', $timestamp, $matches)) {
+                    return $matches[1] . 'T' . $matches[2] . 'Z';
                 }
                 // Parse and convert to UTC
                 $dt = new \DateTime($timestamp);
@@ -219,8 +225,8 @@ class WormHasher
             }
 
             if ($dt) {
-                // Format to seconds precision (truncates microseconds)
-                return $dt->format('Y-m-d H:i:s');
+                // Format to ISO8601 UTC with seconds precision (truncates microseconds)
+                return $dt->format('Y-m-d\TH:i:s\Z');
             }
 
             return '';
