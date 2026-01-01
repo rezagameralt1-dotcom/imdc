@@ -121,16 +121,163 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
+# Pre-flight: Check and reset inconsistent databases
+echo "Pre-flight: Checking database consistency..."
+echo
+
+# Get POSTGRES_USER from container environment or use default
+if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+    POSTGRES_USER="$(docker compose -f infra/docker/docker-compose.yml exec -T db sh -c 'echo "$POSTGRES_USER"' 2>/dev/null | tr -d '\r\n' || echo "imdc")"
+    POSTGRES_USER="${POSTGRES_USER:-imdc}"
+else
+    POSTGRES_USER="${DB_USERNAME:-imdc}"
+fi
+
+# Function: Check and reset database if inconsistent
+# Args: domain_name, db_name, known_tables (space-separated)
+check_and_reset_db() {
+    local domain="$1"
+    local db_name="$2"
+    local known_tables="$3"
+    
+    echo "  Checking ${domain} database (${db_name})..."
+    
+    # Check if database exists
+    set +e
+    if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+        DB_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname='${db_name}';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
+    else
+        # In container: use PHP/PDO to connect to postgres database
+        DB_EXISTS="$(php artisan tinker --execute="
+            try {
+                \$host = config('database.connections.${domain}.host');
+                \$port = config('database.connections.${domain}.port');
+                \$user = config('database.connections.${domain}.username');
+                \$pass = config('database.connections.${domain}.password');
+                \$pdo = new PDO('pgsql:host=' . \$host . ';port=' . \$port . ';dbname=postgres', \$user, \$pass);
+                \$stmt = \$pdo->query('SELECT 1 FROM pg_database WHERE datname=' . \$pdo->quote('${db_name}'));
+                echo \$stmt->fetchColumn() ? 'yes' : 'no';
+            } catch (Exception \$e) {
+                echo 'no';
+            }
+        " 2>/dev/null | tail -1)"
+    fi
+    set -e
+    
+    if [[ "$DB_EXISTS" != "yes" ]]; then
+        echo "    ✓ Database ${db_name} does not exist (will be created by migrations)"
+        return 0
+    fi
+    
+    # Check if migrations table exists
+    set +e
+    if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+        MIGRATIONS_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d "${db_name}" -tc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='migrations';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
+    else
+        MIGRATIONS_EXISTS="$(php artisan tinker --execute="
+            try {
+                \$exists = DB::connection('${domain}')->getSchemaBuilder()->hasTable('migrations');
+                echo \$exists ? 'yes' : 'no';
+            } catch (Exception \$e) {
+                echo 'no';
+            }
+        " 2>/dev/null | tail -1)"
+    fi
+    set -e
+    
+    # Check if any known domain tables exist
+    local domain_tables_exist="no"
+    for table in $known_tables; do
+        set +e
+        if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+            TABLE_EXISTS="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d "${db_name}" -tc "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='${table}';" 2>&1 | grep -q "1" && echo "yes" || echo "no")"
+        else
+            TABLE_EXISTS="$(php artisan tinker --execute="
+                try {
+                    \$exists = DB::connection('${domain}')->getSchemaBuilder()->hasTable('${table}');
+                    echo \$exists ? 'yes' : 'no';
+                } catch (Exception \$e) {
+                    echo 'no';
+                }
+            " 2>/dev/null | tail -1)"
+        fi
+        set -e
+        
+        if [[ "$TABLE_EXISTS" == "yes" ]]; then
+            domain_tables_exist="yes"
+            break
+        fi
+    done
+    
+    # If migrations table doesn't exist BUT domain tables exist => inconsistent
+    if [[ "$MIGRATIONS_EXISTS" != "yes" ]] && [[ "$domain_tables_exist" == "yes" ]]; then
+        echo "    ⚠ Inconsistent state detected: migrations table missing but domain tables exist"
+        echo "    Resetting database ${db_name}..."
+        
+        set +e
+        if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+            # Drop database with FORCE (Postgres 13+)
+            docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "DROP DATABASE IF EXISTS ${db_name} WITH (FORCE);" >/dev/null 2>&1
+            # Recreate database
+            docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE ${db_name};" >/dev/null 2>&1
+            RESET_EXIT=$?
+        else
+            # In container: use PHP/PDO to connect to postgres database
+            RESET_OUTPUT="$(php artisan tinker --execute="
+                try {
+                    \$host = config('database.connections.${domain}.host');
+                    \$port = config('database.connections.${domain}.port');
+                    \$user = config('database.connections.${domain}.username');
+                    \$pass = config('database.connections.${domain}.password');
+                    \$pdo = new PDO('pgsql:host=' . \$host . ';port=' . \$port . ';dbname=postgres', \$user, \$pass);
+                    \$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+                    \$pdo->exec('DROP DATABASE IF EXISTS ${db_name} WITH (FORCE)');
+                    \$pdo->exec('CREATE DATABASE ${db_name}');
+                    echo 'ok';
+                } catch (Exception \$e) {
+                    echo 'failed: ' . \$e->getMessage();
+                }
+            " 2>/dev/null | tail -1)"
+            if [[ "$RESET_OUTPUT" == "ok" ]]; then
+                RESET_EXIT=0
+            else
+                RESET_EXIT=1
+            fi
+        fi
+        set -e
+        
+        if [[ $RESET_EXIT -eq 0 ]]; then
+            echo "    ✓ Database ${db_name} reset successfully"
+        else
+            echo "    ✗ Failed to reset database ${db_name}"
+            exit 1
+        fi
+    else
+        if [[ "$MIGRATIONS_EXISTS" == "yes" ]]; then
+            echo "    ✓ Migrations table exists (consistent state)"
+        else
+            echo "    ✓ No domain tables found (clean state)"
+        fi
+    fi
+}
+
+# Check each domain database
+check_and_reset_db "core" "imdc_core" "users roles permissions personal_access_tokens accounting_vouchers"
+check_and_reset_db "products" "imdc_products" "categories products"
+check_and_reset_db "orders" "imdc_orders" "orders order_items"
+check_and_reset_db "inventory" "imdc_inventory" "inventories stock_movements"
+echo
+
 # Pre-flight: Run migrations per-domain with explicit paths
 echo "Pre-flight: Running domain-specific migrations..."
 echo
 
 # Core accounting migrations
-echo "  [1/4] Core (accounting tables)..."
+echo "  [1/4] Core (users, RBAC, accounting tables)..."
 CORE_MIGRATE_OUTPUT=""
 CORE_MIGRATE_EXIT=0
 set +e
-CORE_MIGRATE_OUTPUT="$(php artisan migrate -n --database=core --path=database/migrations/core 2>&1)"
+CORE_MIGRATE_OUTPUT="$(php artisan migrate --force --database=core --path=database/migrations/core 2>&1)"
 CORE_MIGRATE_EXIT=$?
 set -e
 if [[ $CORE_MIGRATE_EXIT -ne 0 ]]; then
@@ -139,6 +286,33 @@ if [[ $CORE_MIGRATE_EXIT -ne 0 ]]; then
     exit 1
 fi
 echo "    ✓ Core migrations complete"
+
+# Seed admin user after core migrations
+echo "  Seeding admin user..."
+set +e
+SEED_OUTPUT="$(php artisan db:seed --class=AdminUserSeeder --database=core --force 2>&1)"
+SEED_EXIT=$?
+set -e
+if [[ $SEED_EXIT -ne 0 ]]; then
+    echo "  ⚠ Admin user seeding failed (may already exist):"
+    echo "$SEED_OUTPUT" | head -10
+else
+    echo "    ✓ Admin user seeded"
+fi
+echo
+
+# Verify Sanctum core connection
+echo "  Verifying Sanctum core connection..."
+set +e
+SANCTUM_VERIFY_OUTPUT="$(php artisan imdc:verify-sanctum-core 2>&1)"
+SANCTUM_VERIFY_EXIT=$?
+set -e
+if [[ $SANCTUM_VERIFY_EXIT -ne 0 ]]; then
+    echo "✗ Sanctum core connection verification failed:"
+    echo "$SANCTUM_VERIFY_OUTPUT" | head -20
+    exit 1
+fi
+echo "$SANCTUM_VERIFY_OUTPUT" | grep -E "✓|✗" || true
 echo
 
 # Products migrations
@@ -146,7 +320,7 @@ echo "  [2/4] Products..."
 PRODUCTS_MIGRATE_OUTPUT=""
 PRODUCTS_MIGRATE_EXIT=0
 set +e
-PRODUCTS_MIGRATE_OUTPUT="$(php artisan migrate -n --database=products --path=database/migrations/products 2>&1)"
+PRODUCTS_MIGRATE_OUTPUT="$(php artisan migrate --force --database=products --path=database/migrations/products 2>&1)"
 PRODUCTS_MIGRATE_EXIT=$?
 set -e
 if [[ $PRODUCTS_MIGRATE_EXIT -ne 0 ]]; then
@@ -162,7 +336,7 @@ echo "  [3/4] Orders..."
 ORDERS_MIGRATE_OUTPUT=""
 ORDERS_MIGRATE_EXIT=0
 set +e
-ORDERS_MIGRATE_OUTPUT="$(php artisan migrate -n --database=orders --path=database/migrations/orders 2>&1)"
+ORDERS_MIGRATE_OUTPUT="$(php artisan migrate --force --database=orders --path=database/migrations/orders 2>&1)"
 ORDERS_MIGRATE_EXIT=$?
 set -e
 if [[ $ORDERS_MIGRATE_EXIT -ne 0 ]]; then
@@ -179,7 +353,7 @@ if [[ -d "database/migrations/inventory" ]]; then
     INVENTORY_MIGRATE_OUTPUT=""
     INVENTORY_MIGRATE_EXIT=0
     set +e
-    INVENTORY_MIGRATE_OUTPUT="$(php artisan migrate -n --database=inventory --path=database/migrations/inventory 2>&1)"
+    INVENTORY_MIGRATE_OUTPUT="$(php artisan migrate --force --database=inventory --path=database/migrations/inventory 2>&1)"
     INVENTORY_MIGRATE_EXIT=$?
     set -e
     if [[ $INVENTORY_MIGRATE_EXIT -ne 0 ]]; then

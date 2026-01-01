@@ -39,6 +39,11 @@ services:
       - DB_INVENTORY_DATABASE=imdc_inventory
       - DB_INVENTORY_USERNAME=imdc
       - DB_INVENTORY_PASSWORD=imdc
+      - DB_NFTS_HOST=db
+      - DB_NFTS_PORT=5432
+      - DB_NFTS_DATABASE=imdc_nfts
+      - DB_NFTS_USERNAME=imdc
+      - DB_NFTS_PASSWORD=imdc
       - POSTGRES_PASSWORD=imdc
       - REDIS_HOST=redis
       - REDIS_CLIENT=predis
@@ -65,6 +70,7 @@ services:
       POSTGRES_PASSWORD: imdc
     volumes:
       - db_data:/var/lib/postgresql/data
+      - ./postgres-init:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
 
   redis:

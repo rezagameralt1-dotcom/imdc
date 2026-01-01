@@ -11,16 +11,18 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $adminRole = Role::firstOrCreate(['name' => 'Admin']);
-        $userRole  = Role::firstOrCreate(['name' => 'User']);
+        // Ensure we use core connection
+        $adminRole = Role::on('core')->firstOrCreate(['name' => 'Admin']);
+        $userRole  = Role::on('core')->firstOrCreate(['name' => 'User']);
 
-        $admin = User::firstOrCreate(
+        $admin = User::on('core')->firstOrCreate(
             ['email' => 'admin@imdc.local'],
             ['name' => 'IMDC Admin', 'password' => Hash::make('Admin#12345')]
         );
 
-        if (!$admin->roles()->where('role_id', $adminRole->id)->exists()) {
-            $admin->roles()->attach($adminRole->id);
+        // Use Spatie's assignRole method (pass role name string, not model)
+        if (!$admin->hasRole('Admin')) {
+            $admin->assignRole('Admin');
         }
     }
 }

@@ -2,8 +2,12 @@
 
 namespace App\Providers;
 
+use App\Dids\Models\DidProfile;
+use App\Dids\Policies\DidPolicy;
 use App\Inventory\Models\InventoryItem;
 use App\Inventory\Policies\InventoryPolicy;
+use App\Nfts\Models\NftToken;
+use App\Nfts\Policies\NftPolicy;
 use App\Orders\Models\Order;
 use App\Orders\Policies\OrderPolicy;
 use App\Products\Models\Product;
@@ -18,6 +22,8 @@ class AuthServiceProvider extends ServiceProvider
         Product::class => ProductPolicy::class,
         Order::class => OrderPolicy::class,
         InventoryItem::class => InventoryPolicy::class,
+        NftToken::class => NftPolicy::class,
+        DidProfile::class => DidPolicy::class,
     ];
 
     public function boot(): void
@@ -25,7 +31,7 @@ class AuthServiceProvider extends ServiceProvider
         $this->registerPolicies();
 
         Gate::before(function (User $user) {
-            return $user->hasRole('admin') ? true : null;
+            return $user->hasRole('Admin') ? true : null;
         });
     }
 }

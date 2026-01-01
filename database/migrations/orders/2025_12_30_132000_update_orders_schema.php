@@ -41,6 +41,9 @@ return new class extends Migration
             $table->decimal('unit_price', 12, 2);
             $table->decimal('line_total', 12, 2);
             $table->timestamps();
+
+            // Foreign key constraint: order_id -> orders.id (UUID)
+            $table->foreign('order_id')->references('id')->on('orders')->cascadeOnDelete();
         });
     }
 

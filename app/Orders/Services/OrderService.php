@@ -9,6 +9,7 @@ use App\Orders\Models\OrderItem;
 use App\Products\Models\Product;
 use App\Support\AuditLogger;
 use App\Support\Events\RedisStreamPublisher;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,36 +30,26 @@ class OrderService
             throw ValidationException::withMessages(['items' => 'At least one item is required.']);
         }
 
-        // Idempotency check: if idempotency_key provided, validate or return existing order
-        $idempotencyKey = $payload['idempotency_key'] ?? null;
+        // Normalize idempotency_key: trim and limit length (max 128 chars)
+        $idempotencyKey = isset($payload['idempotency_key']) && $payload['idempotency_key'] !== null
+            ? substr(trim((string) $payload['idempotency_key']), 0, 128)
+            : null;
+
+        // STRICT IDEMPOTENCY: Check for existing order BEFORE any side-effects
+        // Must filter by both shop_customer_id AND idempotency_key to ensure per-customer idempotency
         if ($idempotencyKey) {
-            $existingOrder = Order::where('idempotency_key', $idempotencyKey)->first();
+            $existingOrder = Order::where('shop_customer_id', $shopCustomerId)
+                ->where('idempotency_key', $idempotencyKey)
+                ->first();
+            
             if ($existingOrder) {
-                // Verify payload matches existing order
-                $existingItems = $existingOrder->items->map(fn($item) => [
-                    'product_id' => $item->product_id,
-                    'quantity' => $item->quantity,
-                ])->toArray();
-                $newItems = collect($itemsInput)->map(fn($item) => [
-                    'product_id' => $item['product_id'],
-                    'quantity' => (int) $item['quantity'],
-                ])->toArray();
-                
-                // Compare items (order-independent)
-                $existingItemsSorted = collect($existingItems)->sortBy('product_id')->values()->toArray();
-                $newItemsSorted = collect($newItems)->sortBy('product_id')->values()->toArray();
-                
-                if ($existingItemsSorted !== $newItemsSorted || ($payload['currency'] ?? 'USD') !== $existingOrder->currency) {
-                    throw ValidationException::withMessages([
-                        'idempotency_key' => 'Idempotency key already used with different payload'
-                    ]);
-                }
-                
+                // Return existing order immediately (no side-effects)
                 $existingOrder->load('items');
                 return ['order' => $existingOrder, 'is_new' => false];
             }
         }
 
+        // No existing order found, proceed with creation
         $products = Product::whereIn('id', collect($itemsInput)->pluck('product_id'))->get()->keyBy('id');
 
         $orderTotal = 0;
@@ -66,16 +57,37 @@ class OrderService
 
         $meta = $payload['meta'] ?? [];
 
-        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId, $idempotencyKey) {
-            /** @var Order $order */
-            $order = Order::create([
-                'shop_customer_id' => $shopCustomerId,
-                'status' => Order::STATUS_PENDING,
-                'total_amount' => 0,
-                'currency' => $currency,
-                'trace_id' => $traceId,
-                'idempotency_key' => $idempotencyKey,
-            ]);
+        $isNewOrder = true;
+        $order = DB::connection('orders')->transaction(function () use ($itemsInput, $products, &$orderTotal, $currency, $traceId, $meta, $shopCustomerId, $idempotencyKey, &$isNewOrder) {
+            try {
+                /** @var Order $order */
+                $order = Order::create([
+                    'shop_customer_id' => $shopCustomerId,
+                    'status' => Order::STATUS_PENDING,
+                    'total_amount' => 0,
+                    'currency' => $currency,
+                    'trace_id' => $traceId,
+                    'idempotency_key' => $idempotencyKey,
+                ]);
+            } catch (QueryException $e) {
+                // Handle unique constraint violation (Postgres 23505) - race condition
+                // Another request created the order with the same idempotency_key between our check and insert
+                if ($e->getCode() === '23505' || str_contains($e->getMessage(), '23505')) {
+                    // Fetch the existing order that was just created by another request
+                    $existingOrder = Order::where('shop_customer_id', $shopCustomerId)
+                        ->where('idempotency_key', $idempotencyKey)
+                        ->first();
+                    
+                    if ($existingOrder) {
+                        // Mark as existing order (idempotent behavior)
+                        $isNewOrder = false;
+                        $existingOrder->load('items');
+                        return $existingOrder;
+                    }
+                }
+                // Re-throw if it's not a unique constraint violation or order not found
+                throw $e;
+            }
 
             foreach ($itemsInput as $item) {
                 $product = $products->get($item['product_id']);
@@ -108,8 +120,14 @@ class OrderService
             return $order;
         });
 
+        // If order was returned from race condition (existing order), return immediately
+        if (!$isNewOrder) {
+            return ['order' => $order, 'is_new' => false];
+        }
+
         $order->load('items');
 
+        // Proceed with inventory reservation and other side-effects for newly created order
         try {
             $reserved = $this->inventoryService->reserveForOrder(
                 $order->id,

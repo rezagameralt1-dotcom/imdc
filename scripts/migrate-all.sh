@@ -8,7 +8,7 @@ cd "$ROOT_DIR"
 php artisan config:clear >/dev/null || true
 
 echo "[1/4] core..."
-php artisan migrate --force --database=pgsql     --path=database/migrations/core
+php artisan migrate --force --database=core --path=database/migrations/core
 
 echo "[2/4] products..."
 php artisan migrate --force --database=products  --path=database/migrations/products

@@ -1,7 +1,9 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\Api\Did\DidMeController;
 use App\Inventory\Http\Controllers\InventoryController;
+use App\Nfts\Http\Controllers\NftController;
 use App\Orders\Http\Controllers\OrderController;
 use App\Products\Http\Controllers\ProductController;
 use Illuminate\Support\Facades\Route;
@@ -51,6 +53,20 @@ Route::prefix('v1')->group(function () {
         Route::get('inventory/{productId}', [InventoryController::class, 'show']);
         Route::post('inventory/{productId}/adjust', [InventoryController::class, 'adjust']);
         Route::post('inventory/reserve', [InventoryController::class, 'reserve']);
+
+        // NFT routes (only registered when FEATURE_NFT=true)
+        if (config('nft.enabled', false)) {
+            Route::post('nfts/mint', [NftController::class, 'mint']);
+            Route::post('nfts/transfer', [NftController::class, 'transfer']);
+            Route::get('nfts/tokens/{token}', [NftController::class, 'show']);
+        }
+
+        // DID routes (always registered; feature flag checked in controller)
+        Route::prefix('did')->group(function () {
+            Route::get('me', [DidMeController::class, 'show']);
+            Route::post('me', [DidMeController::class, 'store']);
+            Route::put('me', [DidMeController::class, 'update']);
+        });
     });
 });
 

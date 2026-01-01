@@ -1,0 +1,22 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration {
+    public function up(): void {
+        if (Schema::connection('core')->hasTable('permissions')) {
+            return;
+        }
+        Schema::connection('core')->create('permissions', function (Blueprint $table) {
+            $table->id();
+            $table->string('name')->unique();
+            $table->string('title')->nullable();
+            $table->timestamps();
+        });
+    }
+    public function down(): void {
+        Schema::connection('core')->dropIfExists('permissions');
+    }
+};

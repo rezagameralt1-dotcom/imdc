@@ -120,6 +120,21 @@ return [
             'sslmode' => env('INVENTORY_DB_SSLMODE', 'prefer'),
         ],
 
+        'nfts' => [
+            'driver' => 'pgsql',
+            'url' => env('NFTS_DB_URL'),
+            'host' => env('DB_NFTS_HOST', env('DB_HOST', 'db')),
+            'port' => env('DB_NFTS_PORT', env('DB_PORT', '5432')),
+            'database' => env('DB_NFTS_DATABASE', env('DB_DATABASE', 'imdc_nfts')),
+            'username' => env('DB_NFTS_USERNAME', env('DB_USERNAME', 'postgres')),
+            'password' => env('DB_NFTS_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => env('NFTS_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => env('NFTS_DB_SCHEMA', 'public'),
+            'sslmode' => env('NFTS_DB_SSLMODE', 'prefer'),
+        ],
+
         'pgsql' => [
             'driver' => 'pgsql',
             'url' => env('DB_URL'),

@@ -13,6 +13,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     protected $guard_name = 'web';
+    protected $connection = 'core';
 
     /** @var list<string> */
     protected $fillable = [
