@@ -93,8 +93,8 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
-# Pre-flight: Ensure database exists (self-healing)
-echo "Pre-flight: Ensuring nfts database exists..."
+# Pre-flight: Wait for Postgres readiness and ensure database exists (self-healing)
+echo "Pre-flight: Ensuring Postgres readiness and nfts database exists..."
 echo
 
 # Get database connection details from environment or config defaults
@@ -103,39 +103,115 @@ DB_PORT="${DB_NFTS_PORT:-${DB_PORT:-5432}}"
 DB_USER="${DB_NFTS_USERNAME:-${DB_USERNAME:-imdc}}"
 DB_PASS="${DB_NFTS_PASSWORD:-${DB_PASSWORD:-imdc}}"
 DB_NAME="imdc_nfts"
+POSTGRES_USER="${POSTGRES_USER:-${DB_USER}}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-${DB_PASS}}"
 
-# Check if database exists and create if needed (idempotent)
-# Use PHP to create database if psql is not available (works in all contexts)
-set +e
-DB_CHECK_OUTPUT="$(php artisan tinker --execute="
-try {
-    \$conn = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}');
-    \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\");
-    \$exists = \$stmt->fetch() !== false;
-    if (!\$exists) {
-        \$conn->exec(\"CREATE DATABASE ${DB_NAME}\");
-        echo 'created';
-    } else {
-        echo 'exists';
-    }
-} catch (Exception \$e) {
-    echo 'error: ' . \$e->getMessage();
-    exit(1);
-}
-" 2>&1)"
-DB_CHECK_EXIT=$?
-set -e
+# Wait for Postgres to be ready (retry up to 30s)
+echo "  Waiting for Postgres readiness..."
+MAX_WAIT=30
+WAIT_INTERVAL=1
+ELAPSED=0
+POSTGRES_READY=0
 
-if [[ $DB_CHECK_EXIT -eq 0 ]]; then
-    if echo "$DB_CHECK_OUTPUT" | grep -q "created"; then
-        echo "  ✓ Database $DB_NAME created"
-    elif echo "$DB_CHECK_OUTPUT" | grep -q "exists"; then
-        echo "  ✓ Database $DB_NAME already exists"
+while [[ $ELAPSED -lt $MAX_WAIT ]]; do
+    set +e
+    if [[ "${EXEC_CTX}" == "container" ]]; then
+        # In container: use PHP/PDO to check connection
+        php -r "try { \$pdo = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}'); exit(0); } catch (Exception \$e) { exit(1); }" 2>/dev/null
+    elif has_docker_compose; then
+        # On host: use docker compose exec
+        docker compose -f infra/docker/docker-compose.yml exec -T db pg_isready -U "$POSTGRES_USER" >/dev/null 2>&1
     else
-        echo "  ⚠ Database check output: $DB_CHECK_OUTPUT"
+        # Direct connection attempt
+        php -r "try { \$pdo = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}'); exit(0); } catch (Exception \$e) { exit(1); }" 2>/dev/null
+    fi
+    POSTGRES_READY=$?
+    set -e
+    
+    if [[ $POSTGRES_READY -eq 0 ]]; then
+        echo "  ✓ Postgres is ready"
+        break
+    fi
+    
+    sleep $WAIT_INTERVAL
+    ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+done
+
+if [[ $POSTGRES_READY -ne 0 ]]; then
+    echo "  ✗ Postgres not ready after ${MAX_WAIT}s"
+    exit 1
+fi
+
+# Ensure database exists (idempotent)
+echo "  Ensuring database $DB_NAME exists..."
+DB_CREATED=0
+set +e
+
+if has_docker_compose && [[ "${EXEC_CTX}" != "container" ]]; then
+    # On host: use docker compose exec with psql
+    DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>&1)"
+    if echo "$DB_EXISTS_OUTPUT" | grep -q "1"; then
+        echo "  ✓ Database $DB_NAME already exists"
+        DB_CREATED=0
+    else
+        echo "  Creating database $DB_NAME..."
+        docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -c "CREATE DATABASE $DB_NAME" >/dev/null 2>&1
+        if [[ $? -eq 0 ]]; then
+            echo "  ✓ Database $DB_NAME created"
+            DB_CREATED=0
+        else
+            # May already exist (race condition), check again
+            DB_EXISTS_OUTPUT="$(docker compose -f infra/docker/docker-compose.yml exec -T db psql -U "$POSTGRES_USER" -d postgres -tc "SELECT 1 FROM pg_database WHERE datname = '$DB_NAME'" 2>&1)"
+            if echo "$DB_EXISTS_OUTPUT" | grep -q "1"; then
+                echo "  ✓ Database $DB_NAME exists"
+                DB_CREATED=0
+            else
+                echo "  ✗ Failed to create database $DB_NAME"
+                DB_CREATED=1
+            fi
+        fi
     fi
 else
-    echo "  ⚠ Could not verify/create database (may already exist): $DB_CHECK_OUTPUT"
+    # In container or no docker compose: use PHP/PDO
+    DB_CHECK_OUTPUT="$(php artisan tinker --execute="
+    try {
+        \$conn = new PDO('pgsql:host=${DB_HOST};port=${DB_PORT};dbname=postgres', '${DB_USER}', '${DB_PASS}');
+        \$stmt = \$conn->query(\"SELECT 1 FROM pg_database WHERE datname = '${DB_NAME}'\");
+        \$exists = \$stmt->fetch() !== false;
+        if (!\$exists) {
+            \$conn->exec(\"CREATE DATABASE ${DB_NAME}\");
+            echo 'created';
+        } else {
+            echo 'exists';
+        }
+    } catch (Exception \$e) {
+        echo 'error: ' . \$e->getMessage();
+        exit(1);
+    }
+    " 2>&1)"
+    DB_CHECK_EXIT=$?
+    
+    if [[ $DB_CHECK_EXIT -eq 0 ]]; then
+        if echo "$DB_CHECK_OUTPUT" | grep -q "created"; then
+            echo "  ✓ Database $DB_NAME created"
+            DB_CREATED=0
+        elif echo "$DB_CHECK_OUTPUT" | grep -q "exists"; then
+            echo "  ✓ Database $DB_NAME already exists"
+            DB_CREATED=0
+        else
+            echo "  ⚠ Database check output: $DB_CHECK_OUTPUT"
+            DB_CREATED=1
+        fi
+    else
+        echo "  ⚠ Could not verify/create database: $DB_CHECK_OUTPUT"
+        DB_CREATED=1
+    fi
+fi
+set -e
+
+if [[ $DB_CREATED -ne 0 ]]; then
+    echo "  ✗ Failed to ensure database $DB_NAME exists"
+    exit 1
 fi
 echo
 
