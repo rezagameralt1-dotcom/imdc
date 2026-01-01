@@ -72,17 +72,17 @@ Route::prefix('v1')->group(function () {
         // Linking routes (always registered; feature flag checked by middleware)
         Route::middleware(['feature:linking'])->prefix('linking')->group(function () {
             Route::post('did-order', [\App\Http\Controllers\Api\Linking\DidOrderLinkController::class, 'store'])
-                ->middleware('permission:linking.create|linking.admin');
+                ->middleware('role:Admin');
             Route::post('did-nft', [\App\Http\Controllers\Api\Linking\DidNftLinkController::class, 'store'])
-                ->middleware('permission:linking.create|linking.admin');
+                ->middleware('role:Admin');
             Route::post('order-nft', [\App\Http\Controllers\Api\Linking\OrderNftLinkController::class, 'store'])
-                ->middleware('permission:linking.create|linking.admin');
+                ->middleware('role:Admin');
             Route::get('did/{didId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByDid'])
-                ->middleware('permission:linking.read|linking.admin');
+                ->middleware('role:Admin,Auditor');
             Route::get('order/{orderId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByOrder'])
-                ->middleware('permission:linking.read|linking.admin');
+                ->middleware('role:Admin,Auditor');
             Route::get('nft/{nftId}', [\App\Http\Controllers\Api\Linking\LinkingQueryController::class, 'getByNft'])
-                ->middleware('permission:linking.read|linking.admin');
+                ->middleware('role:Admin,Auditor');
         });
     });
 });
