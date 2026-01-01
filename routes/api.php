@@ -106,6 +106,18 @@ Route::prefix('v1')->group(function () {
             Route::post('check', [\App\Http\Controllers\Api\Pharma\PharmaCheckController::class, 'check'])
                 ->middleware('role:Admin');
         });
+
+        // Places routes (always registered; feature flag checked by middleware)
+        Route::middleware(['feature:vr'])->prefix('places')->group(function () {
+            Route::get('', [\App\Http\Controllers\Api\Place\PlaceController::class, 'index'])
+                ->middleware('role:Admin|Auditor');
+            Route::get('{id}', [\App\Http\Controllers\Api\Place\PlaceController::class, 'show'])
+                ->middleware('role:Admin|Auditor');
+            Route::post('', [\App\Http\Controllers\Api\Place\PlaceController::class, 'store'])
+                ->middleware('role:Admin');
+            Route::post('{id}/link-nft', [\App\Http\Controllers\Api\Place\PlaceController::class, 'linkNft'])
+                ->middleware('role:Admin');
+        });
     });
 });
 

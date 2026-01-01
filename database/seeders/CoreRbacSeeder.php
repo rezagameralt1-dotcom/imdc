@@ -66,6 +66,12 @@ final class CoreRbacSeeder extends Seeder
             ['name' => 'pharma.read',      'description' => 'Read drug information'],
             ['name' => 'pharma.check',     'description' => 'Check drug interactions'],
             ['name' => 'pharma.admin',     'description' => 'Administer all pharma operations'],
+
+            // Places permissions
+            ['name' => 'places.read',      'description' => 'Read places information'],
+            ['name' => 'places.create',    'description' => 'Create places'],
+            ['name' => 'places.link',      'description' => 'Link NFTs/DIDs to places'],
+            ['name' => 'places.admin',     'description' => 'Administer all places operations'],
         ];
 
         foreach ($permissions as $p) {
@@ -114,6 +120,7 @@ final class CoreRbacSeeder extends Seeder
             'linking.create', 'linking.read', 'linking.admin',
             'dao.create', 'dao.vote', 'dao.read', 'dao.admin',
             'pharma.read', 'pharma.check', 'pharma.admin',
+            'places.read', 'places.create', 'places.link', 'places.admin',
         ]);
 
         $attach($managerRoleId, [

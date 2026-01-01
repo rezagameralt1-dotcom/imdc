@@ -21,6 +21,7 @@ class EnsureFeatureEnabled
                     'did' => env('FEATURE_DID', false),
                     'dao' => config('dao.enabled', false),
                     'pharma' => config('pharma.enabled', false),
+                    'vr' => config('vr.enabled', false),
                     default => false,
                 };
 

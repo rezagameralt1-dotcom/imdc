@@ -302,6 +302,63 @@ else
 fi
 echo
 
+# Check 3.8: Places guardrail (if FEATURE_VR enabled)
+echo "Check 3.8: Places guardrail (if FEATURE_VR enabled)..."
+FEATURE_VR_ENABLED=false
+FEATURE_VR_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_VR_FROM_ENV="$(grep -E "^FEATURE_VR=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_VR_FROM_ENV" ]]; then
+        FEATURE_VR_VALUE="$FEATURE_VR_FROM_ENV"
+        FEATURE_VR_NORMALIZED="$(echo "$FEATURE_VR_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_VR_NORMALIZED" == "true" ]] || [[ "$FEATURE_VR_NORMALIZED" == "1" ]] || [[ "$FEATURE_VR_NORMALIZED" == "yes" ]] || [[ "$FEATURE_VR_NORMALIZED" == "on" ]]; then
+            FEATURE_VR_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_VR_VALUE" ]]; then
+    FEATURE_VR_VALUE="${FEATURE_VR:-false}"
+    if [[ "$FEATURE_VR_VALUE" == "true" ]] || [[ "$FEATURE_VR_VALUE" == "1" ]]; then
+        FEATURE_VR_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_VR_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-places.sh" ]]; then
+        PLACES_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_VR=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-places.sh --in-container > /tmp/places_guardrail_output.txt 2>&1 || PLACES_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_VR=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-places.sh --in-container" > /tmp/places_guardrail_output.txt 2>&1 || PLACES_EXIT=$?
+        else
+            FEATURE_VR=true "$SCRIPT_DIR/verify-places.sh" > /tmp/places_guardrail_output.txt 2>&1 || PLACES_EXIT=$?
+        fi
+        
+        if [[ $PLACES_EXIT -eq 0 ]]; then
+            if grep -q "All places tests PASSED" /tmp/places_guardrail_output.txt; then
+                echo "✓ Places guardrail PASSED"
+            else
+                echo "✗ Places guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Places guardrail execution failed (exit code: $PLACES_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-places.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_VR is not enabled (FEATURE_VR=${FEATURE_VR_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 
