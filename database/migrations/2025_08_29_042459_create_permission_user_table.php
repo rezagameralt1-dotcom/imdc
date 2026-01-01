@@ -6,8 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        if (Schema::hasTable('permission_user')) return;
-        Schema::create('permission_user', function (Blueprint $table) {
+        if (Schema::connection('core')->hasTable('permission_user')) {
+            return;
+        }
+        Schema::connection('core')->create('permission_user', function (Blueprint $table) {
             $table->unsignedBigInteger('permission_id');
             $table->unsignedBigInteger('user_id');
             $table->primary(['permission_id','user_id']);
@@ -15,5 +17,7 @@ return new class extends Migration {
             $table->foreign('user_id')->references('id')->on('users')->onDelete('cascade');
         });
     }
-    public function down(): void { Schema::dropIfExists('permission_user'); }
+    public function down(): void {
+        Schema::connection('core')->dropIfExists('permission_user');
+    }
 };

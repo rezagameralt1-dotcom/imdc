@@ -6,13 +6,17 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        if (Schema::hasTable('permissions')) return;
-        Schema::create('permissions', function (Blueprint $table) {
+        if (Schema::connection('core')->hasTable('permissions')) {
+            return;
+        }
+        Schema::connection('core')->create('permissions', function (Blueprint $table) {
             $table->id();
             $table->string('name')->unique();
             $table->string('title')->nullable();
             $table->timestamps();
         });
     }
-    public function down(): void { Schema::dropIfExists('permissions'); }
+    public function down(): void {
+        Schema::connection('core')->dropIfExists('permissions');
+    }
 };

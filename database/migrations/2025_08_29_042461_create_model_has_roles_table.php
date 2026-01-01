@@ -6,8 +6,10 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
     public function up(): void {
-        if (Schema::hasTable('model_has_roles')) return;
-        Schema::create('model_has_roles', function (Blueprint $table) {
+        if (Schema::connection('core')->hasTable('model_has_roles')) {
+            return;
+        }
+        Schema::connection('core')->create('model_has_roles', function (Blueprint $table) {
             $table->unsignedBigInteger('role_id');
             $table->string('model_type');
             $table->unsignedBigInteger('model_id');
@@ -16,5 +18,7 @@ return new class extends Migration {
             $table->primary(['role_id', 'model_id', 'model_type'], 'model_has_roles_role_model_type_primary');
         });
     }
-    public function down(): void { Schema::dropIfExists('model_has_roles'); }
+    public function down(): void {
+        Schema::connection('core')->dropIfExists('model_has_roles');
+    }
 };

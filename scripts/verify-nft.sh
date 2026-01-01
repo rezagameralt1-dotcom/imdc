@@ -252,6 +252,44 @@ fi
 echo "✓ Token minted (${#TOKEN} chars)"
 echo
 
+# Helper: Extract JSON value using jq if available, otherwise grep/sed fallback
+extract_json_value() {
+    local json="$1"
+    local path="$2"
+    
+    # Try jq first if available
+    if command -v jq >/dev/null 2>&1; then
+        jq -r "$path // empty" <<< "$json" 2>/dev/null | grep -v '^null$' | head -1
+        return
+    fi
+    
+    # Fallback: grep/sed for common patterns
+    # Try .data.id first (handles both string and numeric IDs)
+    if [[ "$path" == ".data.id" ]] || [[ "$path" == ".data.id // .id" ]]; then
+        # Try .data.id pattern: "data":{"id":value (string or number)
+        # Match: "data":{..."id":"value" or "data":{..."id":123
+        local value="$(echo "$json" | grep -oE '"data"[[:space:]]*:[[:space:]]*\{[^}]*"id"[[:space:]]*:[[:space:]]*("([^"]+)"|[0-9]+)' | sed -nE 's/.*"id"[[:space:]]*:[[:space:]]*("([^"]+)"|([0-9]+)).*/\2\3/p' | head -1)"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return
+        fi
+        # Fallback to top-level .id (string or number)
+        value="$(echo "$json" | grep -oE '"id"[[:space:]]*:[[:space:]]*("([^"]+)"|[0-9]+)' | sed -nE 's/"id"[[:space:]]*:[[:space:]]*("([^"]+)"|([0-9]+))/\2\3/p' | head -1)"
+        if [[ -n "$value" ]]; then
+            echo "$value"
+            return
+        fi
+    fi
+    
+    # Generic fallback for .id (string or number)
+    if [[ "$path" == ".id" ]]; then
+        echo "$json" | grep -oE '"id"[[:space:]]*:[[:space:]]*("([^"]+)"|[0-9]+)' | sed -nE 's/"id"[[:space:]]*:[[:space:]]*("([^"]+)"|([0-9]+))/\2\3/p' | head -1
+        return
+    fi
+    
+    echo ""
+}
+
 # Get current user ID
 echo "Test 2: Getting current user ID..."
 set +e
@@ -261,12 +299,18 @@ set -e
 
 if [[ "${USER_RESPONSE}" != "200" ]]; then
     echo "✗ Could not get user info (HTTP ${USER_RESPONSE})"
+    echo "Response body:"
+    echo "$USER_BODY" | head -20
     exit 1
 fi
 
-USER_ID="$(echo "$USER_BODY" | grep -o '"id":"[^"]*"' | head -1 | sed 's/"id":"\([^"]*\)"/\1/' || echo '')"
+# Extract user ID: try .data.id first, then .id as fallback
+USER_ID="$(extract_json_value "$USER_BODY" ".data.id // .id")"
+
 if [[ -z "$USER_ID" ]]; then
     echo "✗ Could not extract user ID from response"
+    echo "Full JSON response:"
+    echo "$USER_BODY"
     exit 1
 fi
 
