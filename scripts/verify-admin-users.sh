@@ -299,11 +299,21 @@ if [[ "$HTTP_CODE" != "200" ]]; then
     exit 1
 fi
 
-# Extract token from response
-NON_ADMIN_TOKEN="$(echo "$RESPONSE_BODY" | grep -oE '"token"[[:space:]]*:[[:space:]]*"([^"]+)"' | sed -nE 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1 || echo '')"
+# Extract token from response (standard format: {"success":true,"data":{"token":"...","user":{...}}})
+NON_ADMIN_TOKEN="$(echo "$RESPONSE_BODY" | php -r "
+require 'vendor/autoload.php';
+\$data = json_decode(file_get_contents('php://stdin'), true);
+if (isset(\$data['data']['token'])) {
+    echo \$data['data']['token'];
+} elseif (isset(\$data['token'])) {
+    echo \$data['token'];
+} else {
+    echo '';
+}
+" 2>/dev/null || echo '')"
 
 if [ -z "$NON_ADMIN_TOKEN" ]; then
-    # Try alternative response format (data.token)
+    # Fallback: try grep/sed extraction
     NON_ADMIN_TOKEN="$(echo "$RESPONSE_BODY" | grep -oE '"data"[^}]*"token"[[:space:]]*:[[:space:]]*"([^"]+)"' | sed -nE 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1 || echo '')"
 fi
 
