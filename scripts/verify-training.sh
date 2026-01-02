@@ -472,5 +472,3 @@ echo "=== Training Verification Complete ==="
 echo
 
 exit 0
-echo "  FEATURE_TRAINING in .env: $(grep -E '^FEATURE_TRAINING=' .env | tail -n1 | cut -d= -f2- | tr -d '\r')"
-php -r 'echo "  env(FEATURE_TRAINING)=".(getenv("FEATURE_TRAINING")?: "NULL")."\n";'
