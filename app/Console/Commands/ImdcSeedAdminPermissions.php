@@ -59,6 +59,7 @@ class ImdcSeedAdminPermissions extends Command
                 'admin.rbac.roles.read',
                 'admin.rbac.permissions.read',
                 'admin.rbac.permissions.assign',
+                'admin.dashboard.read',
                 'reports.read',
                 'audit.logs.read',
             ];

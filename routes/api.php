@@ -165,6 +165,12 @@ Route::prefix('v1')->group(function () {
                 ->middleware('role:Admin');
         });
 
+        // Admin Dashboard routes (requires FEATURE_ADMIN and FEATURE_REPORTS)
+        Route::middleware(['feature:admin', 'feature:reports'])->prefix('admin')->group(function () {
+            Route::get('dashboard/overview', [\App\Http\Controllers\Api\Admin\DashboardController::class, 'overview'])
+                ->middleware('role:Admin');
+        });
+
         // Admin Users Management routes (gated by FEATURE_ADMIN)
         Route::middleware(['feature:admin'])->prefix('admin')->group(function () {
             Route::get('users', [\App\Http\Controllers\Api\Admin\UsersController::class, 'index'])

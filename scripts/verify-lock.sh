@@ -564,6 +564,40 @@ else
 fi
 echo
 
+# Check 3.13: Admin Dashboard guardrail (if FEATURE_ADMIN enabled)
+echo "Check 3.13: Admin Dashboard guardrail (if FEATURE_ADMIN enabled)..."
+if [[ "$FEATURE_ADMIN_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-admin-dashboard.sh" ]]; then
+        ADMIN_DASHBOARD_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-admin-dashboard.sh --in-container > /tmp/admin_dashboard_guardrail_output.txt 2>&1 || ADMIN_DASHBOARD_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f backend/infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-admin-dashboard.sh --in-container" > /tmp/admin_dashboard_guardrail_output.txt 2>&1 || ADMIN_DASHBOARD_EXIT=$?
+        else
+            FEATURE_ADMIN=true FEATURE_REPORTS=true "$SCRIPT_DIR/verify-admin-dashboard.sh" > /tmp/admin_dashboard_guardrail_output.txt 2>&1 || ADMIN_DASHBOARD_EXIT=$?
+        fi
+        
+        if [[ $ADMIN_DASHBOARD_EXIT -eq 0 ]]; then
+            if grep -q "All admin dashboard tests PASSED" /tmp/admin_dashboard_guardrail_output.txt; then
+                echo "✓ Admin Dashboard guardrail PASSED"
+            else
+                echo "✗ Admin Dashboard guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Admin Dashboard guardrail execution failed (exit code: $ADMIN_DASHBOARD_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-admin-dashboard.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_ADMIN is not enabled (FEATURE_ADMIN=${FEATURE_ADMIN_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 
