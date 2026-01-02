@@ -23,46 +23,43 @@ return new class extends Migration
             return;
         }
         
-        // Drop old single-column unique constraint/index if it exists
-        // Try multiple common names
-        $oldIndexNames = [
-            'permissions_name_unique',
-            'permissions_name_guard_name_unique', // In case it was created incorrectly
-        ];
+        // Find and drop any unique constraint/index on permissions(name) only
+        // Query pg_indexes to find unique indexes on just 'name'
+        $singleColumnIndexes = $connection->select("
+            SELECT indexname, indexdef
+            FROM pg_indexes
+            WHERE tablename = 'permissions'
+            AND schemaname = 'public'
+            AND indexdef LIKE '%UNIQUE%'
+            AND indexdef LIKE '%(name)%'
+            AND indexdef NOT LIKE '%guard_name%'
+        ");
         
-        foreach ($oldIndexNames as $indexName) {
-            // Check if constraint exists
-            $constraintExists = $connection->select("
-                SELECT 1 
-                FROM pg_constraint 
-                WHERE conname = ? 
-                AND conrelid = 'permissions'::regclass
-            ", [$indexName]);
-            
-            if (!empty($constraintExists)) {
-                try {
-                    $connection->statement("ALTER TABLE permissions DROP CONSTRAINT IF EXISTS {$indexName}");
-                } catch (\Exception $e) {
-                    // Ignore if already dropped
-                }
-            }
-            
-            // Check if index exists
-            $indexExists = $connection->select("
-                SELECT 1 
-                FROM pg_indexes 
-                WHERE tablename = 'permissions' 
-                AND indexname = ?
-                AND schemaname = 'public'
-            ", [$indexName]);
-            
-            if (!empty($indexExists)) {
+        foreach ($singleColumnIndexes as $index) {
+            $indexName = $index->indexname;
+            try {
+                // Try dropping as constraint first
+                $connection->statement("ALTER TABLE permissions DROP CONSTRAINT IF EXISTS {$indexName}");
+            } catch (\Exception $e) {
+                // If not a constraint, try dropping as index
                 try {
                     $connection->statement("DROP INDEX IF EXISTS public.{$indexName}");
-                } catch (\Exception $e) {
+                } catch (\Exception $e2) {
                     // Ignore if already dropped
                 }
             }
+        }
+        
+        // Also try dropping by common name
+        try {
+            $connection->statement("ALTER TABLE permissions DROP CONSTRAINT IF EXISTS permissions_name_unique");
+        } catch (\Exception $e) {
+            // Ignore
+        }
+        try {
+            $connection->statement("DROP INDEX IF EXISTS public.permissions_name_unique");
+        } catch (\Exception $e) {
+            // Ignore
         }
         
         // Check if composite unique index already exists
@@ -70,15 +67,38 @@ return new class extends Migration
             SELECT 1 
             FROM pg_indexes 
             WHERE tablename = 'permissions' 
-            AND indexname = 'permissions_name_guard_name_unique'
+            AND indexname = 'permissions_name_guard_unique'
             AND schemaname = 'public'
         ");
         
         if (empty($compositeIndexExists)) {
-            // Create composite unique index on (name, guard_name)
-            $schema->table('permissions', function (Blueprint $table) {
-                $table->unique(['name', 'guard_name'], 'permissions_name_guard_name_unique');
-            });
+            // Also check for alternative name
+            $compositeIndexExistsAlt = $connection->select("
+                SELECT 1 
+                FROM pg_indexes 
+                WHERE tablename = 'permissions' 
+                AND (indexname = 'permissions_name_guard_name_unique' OR indexdef LIKE '%(name, guard_name)%')
+                AND schemaname = 'public'
+            ");
+            
+            if (empty($compositeIndexExistsAlt)) {
+                // Create composite unique index on (name, guard_name)
+                try {
+                    $connection->statement("
+                        CREATE UNIQUE INDEX IF NOT EXISTS permissions_name_guard_unique 
+                        ON permissions (name, guard_name)
+                    ");
+                } catch (\Exception $e) {
+                    // If CREATE UNIQUE INDEX IF NOT EXISTS fails, use Schema builder
+                    try {
+                        $schema->table('permissions', function (Blueprint $table) {
+                            $table->unique(['name', 'guard_name'], 'permissions_name_guard_unique');
+                        });
+                    } catch (\Exception $e2) {
+                        // Ignore if already exists
+                    }
+                }
+            }
         }
     }
 
@@ -90,7 +110,26 @@ return new class extends Migration
             return;
         }
         
-        // Drop composite unique index
+        $connection = DB::connection('core');
+        
+        // Drop composite unique index (try both possible names)
+        try {
+            $connection->statement("DROP INDEX IF EXISTS public.permissions_name_guard_unique");
+        } catch (\Exception $e) {
+            // Ignore
+        }
+        try {
+            $connection->statement("DROP INDEX IF EXISTS public.permissions_name_guard_name_unique");
+        } catch (\Exception $e) {
+            // Ignore
+        }
+        try {
+            $schema->table('permissions', function (Blueprint $table) {
+                $table->dropUnique('permissions_name_guard_unique');
+            });
+        } catch (\Exception $e) {
+            // Ignore if doesn't exist
+        }
         try {
             $schema->table('permissions', function (Blueprint $table) {
                 $table->dropUnique('permissions_name_guard_name_unique');

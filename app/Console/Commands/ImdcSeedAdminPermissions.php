@@ -18,8 +18,39 @@ class ImdcSeedAdminPermissions extends Command
     public function handle(): int
     {
         try {
-            $guards = ['api', 'web'];
             $connection = config('permission.connection', 'core');
+            $dbConnection = \Illuminate\Support\Facades\DB::connection($connection);
+            
+            // Detect if composite unique index exists
+            $compositeUniqueExists = false;
+            try {
+                $indexCheck = $dbConnection->select("
+                    SELECT 1 
+                    FROM pg_indexes 
+                    WHERE tablename = 'permissions' 
+                    AND schemaname = 'public'
+                    AND (
+                        indexname = 'permissions_name_guard_unique' 
+                        OR indexname = 'permissions_name_guard_name_unique'
+                        OR indexdef LIKE '%(name, guard_name)%'
+                    )
+                ");
+                $compositeUniqueExists = !empty($indexCheck);
+            } catch (\Exception $e) {
+                // If query fails, assume legacy schema (single-column unique)
+                $compositeUniqueExists = false;
+            }
+            
+            // Determine which guards to seed
+            if ($compositeUniqueExists) {
+                // New schema: seed both guards
+                $guards = ['api', 'web'];
+            } else {
+                // Legacy schema: seed only one guard (from config)
+                $defaultGuard = config('permission.defaults.guard_name', 'api');
+                $guards = [$defaultGuard];
+                $this->line("Detected legacy schema (single-column unique): seeding only guard '{$defaultGuard}'");
+            }
             
             $permissions = [
                 'admin.users.read',

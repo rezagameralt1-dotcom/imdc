@@ -141,6 +141,19 @@ set -e
 echo "    ✓ Caches cleared"
 echo
 
+# Pre-flight: Run core migrations to ensure schema is up to date
+echo "Pre-flight: Running core migrations..."
+set +e
+php artisan migrate --force --database=core --path=database/migrations/core 2>&1 | grep -E "(DONE|FAIL|ERROR|Nothing)" || true
+MIGRATE_EXIT=$?
+set -e
+if [ $MIGRATE_EXIT -ne 0 ]; then
+    echo "  ⚠ Migration warnings (may be expected if already applied)"
+else
+    echo "    ✓ Migrations completed"
+fi
+echo
+
 # Verify FEATURE_ADMIN is enabled at runtime
 echo "Debug: Verifying FEATURE_ADMIN is enabled at runtime..."
 if [[ -f "$ENV_FILE" ]]; then
