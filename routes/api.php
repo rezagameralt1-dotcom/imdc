@@ -181,6 +181,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('role:Admin');
             Route::get('rbac/permissions', [\App\Http\Controllers\Api\Admin\RbacController::class, 'permissions'])
                 ->middleware('role:Admin');
+            Route::post('rbac/roles/{role}/permissions', [\App\Http\Controllers\Api\Admin\RbacController::class, 'assignPermissionsToRole'])
+                ->middleware('role:Admin');
         });
     });
 });

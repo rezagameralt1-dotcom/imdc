@@ -231,6 +231,20 @@ fi
 echo "✓ Admin token minted (${#ADMIN_TOKEN} chars)"
 echo
 
+# Pre-flight: Seed baseline permissions
+echo "Pre-flight: Seeding baseline admin permissions..."
+set +e
+php artisan imdc:seed-admin-permissions > /tmp/admin_permissions_seed_output.txt 2>&1
+SEED_EXIT=$?
+set -e
+if [ $SEED_EXIT -ne 0 ]; then
+    echo "✗ Failed to seed admin permissions"
+    cat /tmp/admin_permissions_seed_output.txt 2>/dev/null || true
+    exit 1
+fi
+echo "✓ Baseline permissions seeded"
+echo
+
 # Test 2: Ensure non-admin user exists and mint token
 echo "Test 2: Ensuring non-admin user exists and minting token..."
 set +e

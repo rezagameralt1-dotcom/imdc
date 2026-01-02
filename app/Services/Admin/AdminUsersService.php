@@ -7,6 +7,7 @@ use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Role as SpatieRole;
 
 class AdminUsersService
 {
@@ -190,7 +191,7 @@ class AdminUsersService
                 return [
                     'id' => $role->id,
                     'name' => $role->name,
-                    'description' => $role->description,
+                    'guard_name' => $role->guard_name ?? 'api',
                     'created_at' => $role->created_at?->toIso8601String(),
                     'updated_at' => $role->updated_at?->toIso8601String(),
                 ];
@@ -212,11 +213,59 @@ class AdminUsersService
                 return [
                     'id' => $permission->id,
                     'name' => $permission->name,
-                    'description' => $permission->description,
+                    'guard_name' => $permission->guard_name ?? 'api',
                     'created_at' => $permission->created_at?->toIso8601String(),
                     'updated_at' => $permission->updated_at?->toIso8601String(),
                 ];
             })->toArray(),
         ];
+    }
+
+    /**
+     * Assign permissions to role (idempotent)
+     *
+     * @param string $roleName
+     * @param array $permissionNames
+     * @return array
+     */
+    public function assignPermissionsToRole(string $roleName, array $permissionNames): array
+    {
+        return DB::connection('core')->transaction(function () use ($roleName, $permissionNames) {
+            // Use Spatie Role model for permission assignment
+            SpatieRole::setConnection('core');
+            $role = SpatieRole::where('name', $roleName)->first();
+            
+            if (!$role) {
+                throw new \DomainException("Role not found: {$roleName}");
+            }
+            
+            // Validate permission names exist
+            $validPermissions = Permission::on('core')
+                ->whereIn('name', $permissionNames)
+                ->pluck('name')
+                ->toArray();
+            $invalidPermissions = array_diff($permissionNames, $validPermissions);
+            
+            if (!empty($invalidPermissions)) {
+                throw new \DomainException('Invalid permission names: ' . implode(', ', $invalidPermissions));
+            }
+            
+            // Use Spatie's givePermissionTo for idempotent assignment (no duplicates)
+            foreach ($validPermissions as $permissionName) {
+                $role->givePermissionTo($permissionName);
+            }
+            
+            // Refresh to get updated permissions
+            $role->refresh();
+            $role->load('permissions');
+            
+            return [
+                'id' => $role->id,
+                'name' => $role->name,
+                'guard_name' => $role->guard_name ?? 'api',
+                'permissions' => $role->permissions->pluck('name')->toArray(),
+                'updated_at' => $role->updated_at?->toIso8601String(),
+            ];
+        });
     }
 }
