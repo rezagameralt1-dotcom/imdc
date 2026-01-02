@@ -72,6 +72,13 @@ final class CoreRbacSeeder extends Seeder
             ['name' => 'places.create',    'description' => 'Create places'],
             ['name' => 'places.link',      'description' => 'Link NFTs/DIDs to places'],
             ['name' => 'places.admin',     'description' => 'Administer all places operations'],
+
+            // Training permissions
+            ['name' => 'training.read',      'description' => 'Read courses and enrollments'],
+            ['name' => 'training.create',    'description' => 'Create courses'],
+            ['name' => 'training.enroll',    'description' => 'Enroll in courses'],
+            ['name' => 'training.complete',  'description' => 'Complete enrollments and issue skill NFTs'],
+            ['name' => 'training.admin',     'description' => 'Administer all training operations'],
         ];
 
         foreach ($permissions as $p) {
@@ -121,6 +128,7 @@ final class CoreRbacSeeder extends Seeder
             'dao.create', 'dao.vote', 'dao.read', 'dao.admin',
             'pharma.read', 'pharma.check', 'pharma.admin',
             'places.read', 'places.create', 'places.link', 'places.admin',
+            'training.read', 'training.create', 'training.enroll', 'training.complete', 'training.admin',
         ]);
 
         $attach($managerRoleId, [

@@ -22,6 +22,7 @@ class EnsureFeatureEnabled
                     'dao' => config('dao.enabled', false),
                     'pharma' => config('pharma.enabled', false),
                     'vr' => config('vr.enabled', false),
+                    'training' => config('training.enabled', false),
                     default => false,
                 };
 

@@ -359,6 +359,63 @@ else
 fi
 echo
 
+# Check 3.9: Training guardrail (if FEATURE_TRAINING enabled)
+echo "Check 3.9: Training guardrail (if FEATURE_TRAINING enabled)..."
+FEATURE_TRAINING_ENABLED=false
+FEATURE_TRAINING_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_TRAINING_FROM_ENV="$(grep -E "^FEATURE_TRAINING=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_TRAINING_FROM_ENV" ]]; then
+        FEATURE_TRAINING_VALUE="$FEATURE_TRAINING_FROM_ENV"
+        FEATURE_TRAINING_NORMALIZED="$(echo "$FEATURE_TRAINING_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_TRAINING_NORMALIZED" == "true" ]] || [[ "$FEATURE_TRAINING_NORMALIZED" == "1" ]] || [[ "$FEATURE_TRAINING_NORMALIZED" == "yes" ]] || [[ "$FEATURE_TRAINING_NORMALIZED" == "on" ]]; then
+            FEATURE_TRAINING_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_TRAINING_VALUE" ]]; then
+    FEATURE_TRAINING_VALUE="${FEATURE_TRAINING:-false}"
+    if [[ "$FEATURE_TRAINING_VALUE" == "true" ]] || [[ "$FEATURE_TRAINING_VALUE" == "1" ]]; then
+        FEATURE_TRAINING_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_TRAINING_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-training.sh" ]]; then
+        TRAINING_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_TRAINING=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-training.sh --in-container > /tmp/training_guardrail_output.txt 2>&1 || TRAINING_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_TRAINING=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-training.sh --in-container" > /tmp/training_guardrail_output.txt 2>&1 || TRAINING_EXIT=$?
+        else
+            FEATURE_TRAINING=true "$SCRIPT_DIR/verify-training.sh" > /tmp/training_guardrail_output.txt 2>&1 || TRAINING_EXIT=$?
+        fi
+        
+        if [[ $TRAINING_EXIT -eq 0 ]]; then
+            if grep -q "All training tests PASSED" /tmp/training_guardrail_output.txt; then
+                echo "✓ Training guardrail PASSED"
+            else
+                echo "✗ Training guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Training guardrail execution failed (exit code: $TRAINING_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-training.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_TRAINING is not enabled (FEATURE_TRAINING=${FEATURE_TRAINING_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 

@@ -118,6 +118,37 @@ Route::prefix('v1')->group(function () {
             Route::post('{id}/link-nft', [\App\Http\Controllers\Api\Place\PlaceController::class, 'linkNft'])
                 ->middleware('role:Admin');
         });
+
+        // Training routes (always registered; feature flag checked by middleware)
+        Route::middleware(['feature:training'])->prefix('training')->group(function () {
+            // Public/authenticated: List and view courses
+            Route::get('courses', [\App\Http\Controllers\Api\Training\CourseController::class, 'index'])
+                ->middleware('role:Admin|Auditor|Teacher|User');
+            Route::get('courses/{id}', [\App\Http\Controllers\Api\Training\CourseController::class, 'show'])
+                ->middleware('role:Admin|Auditor|Teacher|User');
+
+            // Authenticated user: Enroll
+            Route::post('courses/{id}/enroll', [\App\Http\Controllers\Api\Training\CourseController::class, 'enroll'])
+                ->middleware('role:Admin|Teacher|User');
+
+            // User endpoints: View own data
+            Route::get('users/me/enrollments', [\App\Http\Controllers\Api\Training\UserTrainingController::class, 'enrollments'])
+                ->middleware('role:Admin|Teacher|User');
+            Route::get('users/me/skill-nfts', [\App\Http\Controllers\Api\Training\UserTrainingController::class, 'skillNfts'])
+                ->middleware('role:Admin|Teacher|User');
+
+            // Teacher/Admin: Create, update, publish courses
+            Route::post('courses', [\App\Http\Controllers\Api\Training\CourseController::class, 'store'])
+                ->middleware('role:Admin|Teacher');
+            Route::put('courses/{id}', [\App\Http\Controllers\Api\Training\CourseController::class, 'update'])
+                ->middleware('role:Admin|Teacher');
+            Route::post('courses/{id}/publish', [\App\Http\Controllers\Api\Training\CourseController::class, 'publish'])
+                ->middleware('role:Admin|Teacher');
+
+            // Teacher/Admin: Complete enrollments (issue skill NFT)
+            Route::post('enrollments/{id}/complete', [\App\Http\Controllers\Api\Training\EnrollmentController::class, 'complete'])
+                ->middleware('role:Admin|Teacher');
+        });
     });
 });
 
