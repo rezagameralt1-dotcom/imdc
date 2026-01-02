@@ -130,7 +130,7 @@ else
     echo
 fi
 
-echo "Pre-flight: Clearing caches..."
+echo "Pre-flight: Clearing caches after .env modification..."
 set +e
 php artisan optimize:clear 2>/dev/null || true
 php artisan config:clear 2>/dev/null || true
@@ -140,22 +140,38 @@ set -e
 echo "    ✓ Caches cleared"
 echo
 
-# Verify FEATURE_TRAINING is enabled at runtime
-echo "Debug: Verifying FEATURE_TRAINING is enabled..."
-FEATURE_TRAINING_ENV="$(grep -E '^FEATURE_TRAINING=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || echo '')"
-echo "  FEATURE_TRAINING in .env: ${FEATURE_TRAINING_ENV:-not set}"
+# Verify FEATURE_TRAINING is enabled at runtime before API calls
+echo "Debug: Verifying FEATURE_TRAINING is enabled at runtime..."
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_TRAINING_ENV="$(grep -E '^FEATURE_TRAINING=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || echo '')"
+    echo "  FEATURE_TRAINING in .env: ${FEATURE_TRAINING_ENV:-not set}"
+else
+    echo "  FEATURE_TRAINING in .env: (file not found)"
+fi
+
+FEATURE_TRAINING_GETENV="$(php -r 'echo getenv("FEATURE_TRAINING") ?: "NULL";' 2>/dev/null || echo 'unknown')"
+echo "  getenv('FEATURE_TRAINING'): ${FEATURE_TRAINING_GETENV}"
+
 FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); echo config('training.enabled') ? 'true' : 'false';" 2>/dev/null || echo 'unknown')"
 echo "  config('training.enabled'): ${FEATURE_TRAINING_PHP}"
+
 if [[ "$FEATURE_TRAINING_PHP" != "true" ]]; then
     echo "  ⚠ WARNING: FEATURE_TRAINING is not enabled at runtime!"
-    echo "  Clearing caches again..."
+    echo "  Clearing caches again and re-checking..."
+    set +e
     php artisan optimize:clear 2>/dev/null || true
     php artisan config:clear 2>/dev/null || true
     php artisan cache:clear 2>/dev/null || true
     php artisan route:clear 2>/dev/null || true
+    set -e
     FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); echo config('training.enabled') ? 'true' : 'false';" 2>/dev/null || echo 'unknown')"
     echo "  config('training.enabled') after re-clear: ${FEATURE_TRAINING_PHP}"
+    if [[ "$FEATURE_TRAINING_PHP" != "true" ]]; then
+        echo "  ✗ ERROR: FEATURE_TRAINING still not enabled after cache clear!"
+        exit 1
+    fi
 fi
+echo "  ✓ FEATURE_TRAINING confirmed enabled at runtime"
 echo
 
 API_BASE_URL="${IMDC_API_BASE_URL:-http://web:80}"

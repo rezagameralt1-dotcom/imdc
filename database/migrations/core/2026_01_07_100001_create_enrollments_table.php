@@ -56,6 +56,58 @@ return new class extends Migration
                 // FK may not be supported, skip
             }
         });
+
+        // After table creation, conditionally add did_id FK if did_profiles exists
+        try {
+            $didExistsPub = DB::connection('core')->selectOne("
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'pub' AND table_name = 'did_profiles'
+                ) as exists
+            ");
+
+            $didExistsPublic = DB::connection('core')->selectOne("
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'did_profiles'
+                ) as exists
+            ");
+
+            if (($didExistsPub && $didExistsPub->exists) || ($didExistsPublic && $didExistsPublic->exists)) {
+                // Drop existing FK if it exists (safe to run multiple times)
+                try {
+                    DB::connection('core')->statement("
+                        ALTER TABLE pub.enrollments 
+                        DROP CONSTRAINT IF EXISTS pub_enrollments_did_id_foreign CASCADE
+                    ");
+                } catch (\Exception $e) {
+                    // Ignore if FK doesn't exist
+                }
+
+                // Add FK
+                try {
+                    if ($didExistsPub && $didExistsPub->exists) {
+                        DB::connection('core')->statement("
+                            ALTER TABLE pub.enrollments 
+                            ADD CONSTRAINT pub_enrollments_did_id_foreign 
+                            FOREIGN KEY (did_id) REFERENCES pub.did_profiles(id) 
+                            ON DELETE SET NULL
+                        ");
+                    } elseif ($didExistsPublic && $didExistsPublic->exists) {
+                        DB::connection('core')->statement("
+                            ALTER TABLE pub.enrollments 
+                            ADD CONSTRAINT pub_enrollments_did_id_foreign 
+                            FOREIGN KEY (did_id) REFERENCES did_profiles(id) 
+                            ON DELETE SET NULL
+                        ");
+                    }
+                } catch (\Exception $e) {
+                    // FK may already exist or creation failed, skip
+                }
+            }
+        } catch (\Exception $e) {
+            // Ignore if check fails
+        }
     }
 
     public function down(): void

@@ -16,6 +16,27 @@ return new class extends Migration
 
         $connection = DB::connection('core');
 
+        // Ensure did_id column exists and is nullable UUID
+        try {
+            $columnExists = $connection->selectOne("
+                SELECT EXISTS (
+                    SELECT FROM information_schema.columns 
+                    WHERE table_schema = 'pub' 
+                    AND table_name = 'enrollments' 
+                    AND column_name = 'did_id'
+                ) as exists
+            ");
+
+            if (!$columnExists || !$columnExists->exists) {
+                $connection->statement("
+                    ALTER TABLE pub.enrollments 
+                    ADD COLUMN did_id UUID NULL
+                ");
+            }
+        } catch (\Exception $e) {
+            // Column may already exist, skip
+        }
+
         // Drop existing FK if it exists (safe to run multiple times)
         try {
             $connection->statement("
@@ -33,7 +54,7 @@ return new class extends Migration
                 END \$\$;
             ");
         } catch (\Exception $e) {
-            // Ignore if FK doesn't exist
+            // Ignore if FK doesn't exist or drop fails
         }
 
         // Check if did_profiles exists in pub schema
