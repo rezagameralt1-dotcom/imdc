@@ -2,6 +2,7 @@
 
 namespace App\Services\Admin;
 
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -135,5 +136,87 @@ class AdminUsersService
                 'updated_at' => $user->updated_at?->toIso8601String(),
             ];
         });
+    }
+
+    /**
+     * Assign permissions to user (idempotent)
+     *
+     * @param int $userId
+     * @param array $permissionNames
+     * @return array
+     */
+    public function assignPermissions(int $userId, array $permissionNames): array
+    {
+        return DB::connection('core')->transaction(function () use ($userId, $permissionNames) {
+            $user = User::on('core')->findOrFail($userId);
+            
+            // Validate permission names exist
+            $validPermissions = Permission::on('core')->whereIn('name', $permissionNames)->pluck('name')->toArray();
+            $invalidPermissions = array_diff($permissionNames, $validPermissions);
+            
+            if (!empty($invalidPermissions)) {
+                throw new \DomainException('Invalid permission names: ' . implode(', ', $invalidPermissions));
+            }
+            
+            // Sync permissions (idempotent: same permissions = no change)
+            // Spatie Permission's syncPermissions accepts permission names (strings) or permission models
+            $user->syncPermissions($validPermissions);
+            
+            // Refresh to get updated permissions
+            $user->refresh();
+            $user->load('permissions');
+            
+            return [
+                'id' => $user->id,
+                'name' => $user->name,
+                'email' => $user->email,
+                'permissions' => $user->permissions->pluck('name')->toArray(),
+                'updated_at' => $user->updated_at?->toIso8601String(),
+            ];
+        });
+    }
+
+    /**
+     * Get all roles
+     *
+     * @return array
+     */
+    public function getRoles(): array
+    {
+        $roles = Role::on('core')->orderBy('name')->get();
+        
+        return [
+            'roles' => $roles->map(function ($role) {
+                return [
+                    'id' => $role->id,
+                    'name' => $role->name,
+                    'description' => $role->description,
+                    'created_at' => $role->created_at?->toIso8601String(),
+                    'updated_at' => $role->updated_at?->toIso8601String(),
+                ];
+            })->toArray(),
+        ];
+    }
+
+    /**
+     * Get all permissions
+     *
+     * @return array
+     */
+    public function getPermissions(): array
+    {
+        $permissions = Permission::on('core')->orderBy('name')->get();
+        
+        return [
+            'permissions' => $permissions->map(function ($permission) {
+                return [
+                    'id' => $permission->id,
+                    'name' => $permission->name,
+                    'description' => $permission->description,
+                    'created_at' => $permission->created_at?->toIso8601String(),
+                    'updated_at' => $permission->updated_at?->toIso8601String(),
+                ];
+            })->toArray(),
+        ];
     }
 }

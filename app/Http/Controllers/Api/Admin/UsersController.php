@@ -81,4 +81,26 @@ class UsersController extends ApiController
             return $this->errorResponse('Failed to assign roles: ' . $e->getMessage(), 500);
         }
     }
+
+    /**
+     * Assign permissions to user (idempotent)
+     */
+    public function assignPermissions(Request $request, int $id): JsonResponse
+    {
+        try {
+            $request->validate([
+                'permissions' => 'required|array',
+                'permissions.*' => 'required|string',
+            ]);
+            
+            $permissionNames = $request->input('permissions');
+            $user = $this->adminUsersService->assignPermissions($id, $permissionNames);
+            
+            return $this->successResponse($user);
+        } catch (DomainException $e) {
+            return $this->errorResponse($e->getMessage(), 422);
+        } catch (\Exception $e) {
+            return $this->errorResponse('Failed to assign permissions: ' . $e->getMessage(), 500);
+        }
+    }
 }

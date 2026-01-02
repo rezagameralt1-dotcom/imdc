@@ -173,6 +173,14 @@ Route::prefix('v1')->group(function () {
                 ->middleware('role:Admin');
             Route::put('users/{id}/roles', [\App\Http\Controllers\Api\Admin\UsersController::class, 'assignRoles'])
                 ->middleware('role:Admin');
+            Route::put('users/{id}/permissions', [\App\Http\Controllers\Api\Admin\UsersController::class, 'assignPermissions'])
+                ->middleware('role:Admin');
+
+            // Admin RBAC management
+            Route::get('rbac/roles', [\App\Http\Controllers\Api\Admin\RbacController::class, 'roles'])
+                ->middleware('role:Admin');
+            Route::get('rbac/permissions', [\App\Http\Controllers\Api\Admin\RbacController::class, 'permissions'])
+                ->middleware('role:Admin');
         });
     });
 });

@@ -530,6 +530,40 @@ else
 fi
 echo
 
+# Check 3.12: Admin RBAC guardrail (if FEATURE_ADMIN enabled)
+echo "Check 3.12: Admin RBAC guardrail (if FEATURE_ADMIN enabled)..."
+if [[ "$FEATURE_ADMIN_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-admin-rbac.sh" ]]; then
+        ADMIN_RBAC_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-admin-rbac.sh --in-container > /tmp/admin_rbac_guardrail_output.txt 2>&1 || ADMIN_RBAC_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f backend/infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-admin-rbac.sh --in-container" > /tmp/admin_rbac_guardrail_output.txt 2>&1 || ADMIN_RBAC_EXIT=$?
+        else
+            FEATURE_ADMIN=true FEATURE_REPORTS=true "$SCRIPT_DIR/verify-admin-rbac.sh" > /tmp/admin_rbac_guardrail_output.txt 2>&1 || ADMIN_RBAC_EXIT=$?
+        fi
+        
+        if [[ $ADMIN_RBAC_EXIT -eq 0 ]]; then
+            if grep -q "All admin RBAC tests PASSED" /tmp/admin_rbac_guardrail_output.txt; then
+                echo "✓ Admin RBAC guardrail PASSED"
+            else
+                echo "✗ Admin RBAC guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Admin RBAC guardrail execution failed (exit code: $ADMIN_RBAC_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-admin-rbac.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
+else
+    echo "  SKIPPED: FEATURE_ADMIN is not enabled (FEATURE_ADMIN=${FEATURE_ADMIN_VALUE})"
+fi
+echo
+
 # Check 4: No "application" hostname in code (hostname-only; ignore MIME/docs)
 echo "Check 4: No 'application' hostname found in code..."
 
