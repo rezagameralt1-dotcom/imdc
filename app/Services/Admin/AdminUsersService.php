@@ -251,9 +251,14 @@ class AdminUsersService
             $invalidPermissions = array_diff($permissionNames, $validPermissionNames);
             
             if (!empty($invalidPermissions)) {
-                throw new \DomainException(
-                    'Invalid permission names for guard "' . $guard . '": ' . implode(', ', $invalidPermissions)
-                );
+                $errorMessage = 'Invalid permission names for guard "' . $guard . '": ' . implode(', ', $invalidPermissions);
+                $error = new \DomainException($errorMessage);
+                $error->details = [
+                    'guard' => $guard,
+                    'missing' => array_values($invalidPermissions),
+                    'requested' => $permissionNames,
+                ];
+                throw $error;
             }
             
             // Use Spatie's givePermissionTo for idempotent assignment (no duplicates)

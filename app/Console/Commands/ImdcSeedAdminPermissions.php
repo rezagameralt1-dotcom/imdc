@@ -37,19 +37,38 @@ class ImdcSeedAdminPermissions extends Command
             
             foreach ($guards as $guardName) {
                 foreach ($permissions as $permissionName) {
-                    // Use on() to specify connection, firstOrCreate for idempotency by (name, guard_name)
-                    $permission = Permission::on($connection)->firstOrCreate(
-                        [
-                            'name' => $permissionName,
-                            'guard_name' => $guardName,
-                        ]
-                    );
-                    
-                    if ($permission->wasRecentlyCreated) {
-                        $created++;
-                        $this->line("Created: {$permissionName} (guard: {$guardName})");
-                    } else {
-                        $existing++;
+                    try {
+                        // Use on() to specify connection, firstOrCreate for idempotency by (name, guard_name)
+                        $permission = Permission::on($connection)->firstOrCreate(
+                            [
+                                'name' => $permissionName,
+                                'guard_name' => $guardName,
+                            ]
+                        );
+                        
+                        if ($permission->wasRecentlyCreated) {
+                            $created++;
+                            $this->line("Created: {$permissionName} (guard: {$guardName})");
+                        } else {
+                            $existing++;
+                        }
+                    } catch (\Exception $e) {
+                        // Handle race condition: if constraint violation, re-fetch
+                        if (str_contains($e->getMessage(), 'unique') || str_contains($e->getMessage(), 'duplicate')) {
+                            $permission = Permission::on($connection)
+                                ->where('name', $permissionName)
+                                ->where('guard_name', $guardName)
+                                ->first();
+                            
+                            if ($permission) {
+                                $existing++;
+                            } else {
+                                // Re-throw if it's not a constraint issue
+                                throw $e;
+                            }
+                        } else {
+                            throw $e;
+                        }
                     }
                 }
             }
