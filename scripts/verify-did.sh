@@ -106,9 +106,10 @@ echo "API Base URL: ${API_BASE_URL}"
 echo
 
 # Pre-flight: Clear caches to ensure FEATURE_DID from .env is read at runtime
-echo "Pre-flight: Clearing caches to ensure FEATURE_DID from .env is read at runtime..."
+echo "Pre-flight: Clearing caches after .env modification..."
 echo
 set +e
+php artisan optimize:clear 2>/dev/null || true
 php artisan config:clear 2>/dev/null || true
 php artisan cache:clear 2>/dev/null || true
 php artisan route:clear 2>/dev/null || true
@@ -116,17 +117,38 @@ set -e
 echo "    ✓ Caches cleared (config, cache, route)"
 echo
 
-# Debug: Show effective FEATURE_DID value from .env
-echo "Debug: Verifying FEATURE_DID is enabled..."
+# Verify FEATURE_DID is enabled at runtime before API calls
+echo "Debug: Verifying FEATURE_DID is enabled at runtime..."
 if [[ -f "$ENV_FILE" ]]; then
-    FEATURE_DID_FROM_ENV="$(grep -E "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
-    echo "  FEATURE_DID from .env: ${FEATURE_DID_FROM_ENV}"
-    if [[ "$FEATURE_DID_FROM_ENV" != "true" ]]; then
-        echo "  ⚠ WARNING: FEATURE_DID in .env is not 'true'"
-    fi
+    FEATURE_DID_ENV="$(grep -E '^FEATURE_DID=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || echo '')"
+    echo "  FEATURE_DID in .env: ${FEATURE_DID_ENV:-not set}"
 else
-    echo "  .env file not found - using exported FEATURE_DID=${FEATURE_DID:-not set}"
+    echo "  FEATURE_DID in .env: (file not found)"
 fi
+
+FEATURE_DID_GETENV="$(php -r 'echo getenv("FEATURE_DID") ?: "NULL";' 2>/dev/null || echo 'unknown')"
+echo "  getenv('FEATURE_DID'): ${FEATURE_DID_GETENV}"
+
+FEATURE_DID_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('did.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
+echo "  config('did.enabled'): ${FEATURE_DID_PHP}"
+
+if [[ "$FEATURE_DID_PHP" != "true" ]]; then
+    echo "  ⚠ WARNING: FEATURE_DID is not enabled at runtime!"
+    echo "  Clearing caches again and re-checking..."
+    set +e
+    php artisan optimize:clear 2>/dev/null || true
+    php artisan config:clear 2>/dev/null || true
+    php artisan cache:clear 2>/dev/null || true
+    php artisan route:clear 2>/dev/null || true
+    set -e
+    FEATURE_DID_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('did.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
+    echo "  config('did.enabled') after re-clear: ${FEATURE_DID_PHP}"
+    if [[ "$FEATURE_DID_PHP" != "true" ]]; then
+        echo "  ✗ ERROR: FEATURE_DID still not enabled after cache clear!"
+        exit 1
+    fi
+fi
+echo "  ✓ FEATURE_DID confirmed enabled at runtime"
 echo
 
 curl_http_code() {

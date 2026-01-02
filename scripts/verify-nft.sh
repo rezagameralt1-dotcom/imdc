@@ -134,9 +134,10 @@ echo "API Base URL: ${API_BASE_URL}"
 echo
 
 # Pre-flight: Clear caches to ensure FEATURE_NFT from .env is read at runtime
-echo "Pre-flight: Clearing caches to ensure FEATURE_NFT from .env is read at runtime..."
+echo "Pre-flight: Clearing caches after .env modification..."
 echo
 set +e
+php artisan optimize:clear 2>/dev/null || true
 php artisan config:clear 2>/dev/null || true
 php artisan cache:clear 2>/dev/null || true
 php artisan route:clear 2>/dev/null || true
@@ -144,17 +145,38 @@ set -e
 echo "    ✓ Caches cleared (config, cache, route)"
 echo
 
-# Debug: Show effective FEATURE_NFT value from .env
-echo "Debug: Verifying FEATURE_NFT is enabled..."
+# Verify FEATURE_NFT is enabled at runtime before API calls
+echo "Debug: Verifying FEATURE_NFT is enabled at runtime..."
 if [[ -f "$ENV_FILE" ]]; then
-    FEATURE_NFT_FROM_ENV_AFTER="$(grep -E "^FEATURE_NFT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
-    echo "  FEATURE_NFT from .env: ${FEATURE_NFT_FROM_ENV_AFTER}"
-    if [[ "$FEATURE_NFT_FROM_ENV_AFTER" != "true" ]]; then
-        echo "  ⚠ WARNING: FEATURE_NFT in .env is not 'true'"
-    fi
+    FEATURE_NFT_ENV="$(grep -E '^FEATURE_NFT=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '\r' || echo '')"
+    echo "  FEATURE_NFT in .env: ${FEATURE_NFT_ENV:-not set}"
 else
-    echo "  .env file not found - using exported FEATURE_NFT=${FEATURE_NFT:-not set}"
+    echo "  FEATURE_NFT in .env: (file not found)"
 fi
+
+FEATURE_NFT_GETENV="$(php -r 'echo getenv("FEATURE_NFT") ?: "NULL";' 2>/dev/null || echo 'unknown')"
+echo "  getenv('FEATURE_NFT'): ${FEATURE_NFT_GETENV}"
+
+FEATURE_NFT_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('nft.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
+echo "  config('nft.enabled'): ${FEATURE_NFT_PHP}"
+
+if [[ "$FEATURE_NFT_PHP" != "true" ]]; then
+    echo "  ⚠ WARNING: FEATURE_NFT is not enabled at runtime!"
+    echo "  Clearing caches again and re-checking..."
+    set +e
+    php artisan optimize:clear 2>/dev/null || true
+    php artisan config:clear 2>/dev/null || true
+    php artisan cache:clear 2>/dev/null || true
+    php artisan route:clear 2>/dev/null || true
+    set -e
+    FEATURE_NFT_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('nft.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
+    echo "  config('nft.enabled') after re-clear: ${FEATURE_NFT_PHP}"
+    if [[ "$FEATURE_NFT_PHP" != "true" ]]; then
+        echo "  ✗ ERROR: FEATURE_NFT still not enabled after cache clear!"
+        exit 1
+    fi
+fi
+echo "  ✓ FEATURE_NFT confirmed enabled at runtime"
 echo
 
 curl_http_code() {

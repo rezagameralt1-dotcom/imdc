@@ -18,7 +18,7 @@ class EnsureFeatureEnabled
                 $enabled = match($feature) {
                     'linking' => config('linking.enabled', false),
                     'nft' => config('nft.enabled', false),
-                    'did' => env('FEATURE_DID', false),
+                    'did' => config('did.enabled', false),
                     'dao' => config('dao.enabled', false),
                     'pharma' => config('pharma.enabled', false),
                     'vr' => config('vr.enabled', false),

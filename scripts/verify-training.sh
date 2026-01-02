@@ -152,7 +152,7 @@ fi
 FEATURE_TRAINING_GETENV="$(php -r 'echo getenv("FEATURE_TRAINING") ?: "NULL";' 2>/dev/null || echo 'unknown')"
 echo "  getenv('FEATURE_TRAINING'): ${FEATURE_TRAINING_GETENV}"
 
-FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); echo config('training.enabled') ? 'true' : 'false';" 2>/dev/null || echo 'unknown')"
+FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('training.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
 echo "  config('training.enabled'): ${FEATURE_TRAINING_PHP}"
 
 if [[ "$FEATURE_TRAINING_PHP" != "true" ]]; then
@@ -164,7 +164,7 @@ if [[ "$FEATURE_TRAINING_PHP" != "true" ]]; then
     php artisan cache:clear 2>/dev/null || true
     php artisan route:clear 2>/dev/null || true
     set -e
-    FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); echo config('training.enabled') ? 'true' : 'false';" 2>/dev/null || echo 'unknown')"
+    FEATURE_TRAINING_PHP="$(php -r "require 'vendor/autoload.php'; \$app = require 'bootstrap/app.php'; \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap(); var_export(config('training.enabled'));" 2>/dev/null | grep -oE '(true|false)' | head -1 || echo 'unknown')"
     echo "  config('training.enabled') after re-clear: ${FEATURE_TRAINING_PHP}"
     if [[ "$FEATURE_TRAINING_PHP" != "true" ]]; then
         echo "  ✗ ERROR: FEATURE_TRAINING still not enabled after cache clear!"
