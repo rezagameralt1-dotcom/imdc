@@ -387,14 +387,14 @@ require 'vendor/autoload.php';
 echo \$user ? \$user->id : '2';
 " 2>/dev/null || echo '2')"
 
-# Check if "User" or "Seller" role exists, use "User" as default
+# Check if "User" or "Seller" role exists (direct DB query, no guard_name)
 ROLE_NAME="User"
 ROLE_EXISTS="$(php -r "
 require 'vendor/autoload.php';
 \$app = require 'bootstrap/app.php';
 \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
-\$role = \App\Models\Role::on('core')->where('name', 'User')->first();
-echo \$role ? 'yes' : 'no';
+\$roleId = \Illuminate\Support\Facades\DB::connection('core')->table('roles')->where('name', 'User')->value('id');
+echo \$roleId ? 'yes' : 'no';
 " 2>/dev/null || echo 'no')"
 
 if [[ "$ROLE_EXISTS" != "yes" ]]; then
@@ -404,8 +404,8 @@ if [[ "$ROLE_EXISTS" != "yes" ]]; then
 require 'vendor/autoload.php';
 \$app = require 'bootstrap/app.php';
 \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
-\$role = \App\Models\Role::on('core')->where('name', 'Seller')->first();
-echo \$role ? 'yes' : 'no';
+\$roleId = \Illuminate\Support\Facades\DB::connection('core')->table('roles')->where('name', 'Seller')->value('id');
+echo \$roleId ? 'yes' : 'no';
 " 2>/dev/null || echo 'no')"
 fi
 
