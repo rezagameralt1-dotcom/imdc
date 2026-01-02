@@ -119,11 +119,9 @@ class AdminUsersService
                 throw new \DomainException('Invalid role names: ' . implode(', ', $invalidRoles));
             }
             
-            // Get role models
-            $roles = Role::on('core')->whereIn('name', $validRoles)->get();
-            
             // Sync roles (idempotent: same roles = no change)
-            $user->syncRoles($roles);
+            // Spatie Permission's syncRoles accepts role names (strings) or role models
+            $user->syncRoles($validRoles);
             
             // Refresh to get updated roles
             $user->refresh();
