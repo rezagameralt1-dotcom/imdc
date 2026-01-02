@@ -76,13 +76,18 @@ class RbacController extends ApiController
             return $this->successResponse($roleData);
         } catch (DomainException $e) {
             $errorMessage = $e->getMessage();
+            $details = null;
             
-            // Include details if available
-            if (isset($e->details) && is_array($e->details)) {
-                $errorMessage .= ' (guard: ' . ($e->details['guard'] ?? 'unknown') . ', missing: ' . implode(', ', $e->details['missing'] ?? []) . ')';
+            // Include details if available (from service exception)
+            if (isset($e->guard) && isset($e->missing)) {
+                $details = [
+                    'guard' => $e->guard,
+                    'missing' => $e->missing,
+                    'requested' => $e->requested ?? [],
+                ];
             }
             
-            return $this->errorResponse($errorMessage, 422);
+            return $this->errorResponse($errorMessage, 422, $details);
         } catch (\Exception $e) {
             return $this->errorResponse('Failed to assign permissions: ' . $e->getMessage(), 500);
         }

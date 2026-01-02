@@ -253,11 +253,10 @@ class AdminUsersService
             if (!empty($invalidPermissions)) {
                 $errorMessage = 'Invalid permission names for guard "' . $guard . '": ' . implode(', ', $invalidPermissions);
                 $error = new \DomainException($errorMessage);
-                $error->details = [
-                    'guard' => $guard,
-                    'missing' => array_values($invalidPermissions),
-                    'requested' => $permissionNames,
-                ];
+                // Store details for controller to use
+                $error->guard = $guard;
+                $error->missing = array_values($invalidPermissions);
+                $error->requested = $permissionNames;
                 throw $error;
             }
             
