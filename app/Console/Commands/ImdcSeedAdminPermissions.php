@@ -8,17 +8,17 @@ use Spatie\Permission\Models\Permission;
 /**
  * Seed Admin Permissions
  * 
- * Idempotently creates baseline admin permissions with guard_name='api'
+ * Idempotently creates baseline admin permissions for both 'api' and 'web' guards
  */
 class ImdcSeedAdminPermissions extends Command
 {
     protected $signature = 'imdc:seed-admin-permissions';
-    protected $description = 'Seed baseline admin permissions (idempotent, guard_name=api)';
+    protected $description = 'Seed baseline admin permissions (idempotent, guards: api, web)';
 
     public function handle(): int
     {
         try {
-            $guardName = 'api';
+            $guards = ['api', 'web'];
             $connection = config('permission.connection', 'core');
             
             $permissions = [
@@ -35,20 +35,22 @@ class ImdcSeedAdminPermissions extends Command
             $created = 0;
             $existing = 0;
             
-            foreach ($permissions as $permissionName) {
-                // Use on() to specify connection, firstOrCreate for idempotency
-                $permission = Permission::on($connection)->firstOrCreate(
-                    [
-                        'name' => $permissionName,
-                        'guard_name' => $guardName,
-                    ]
-                );
-                
-                if ($permission->wasRecentlyCreated) {
-                    $created++;
-                    $this->line("Created: {$permissionName}");
-                } else {
-                    $existing++;
+            foreach ($guards as $guardName) {
+                foreach ($permissions as $permissionName) {
+                    // Use on() to specify connection, firstOrCreate for idempotency by (name, guard_name)
+                    $permission = Permission::on($connection)->firstOrCreate(
+                        [
+                            'name' => $permissionName,
+                            'guard_name' => $guardName,
+                        ]
+                    );
+                    
+                    if ($permission->wasRecentlyCreated) {
+                        $created++;
+                        $this->line("Created: {$permissionName} (guard: {$guardName})");
+                    } else {
+                        $existing++;
+                    }
                 }
             }
             

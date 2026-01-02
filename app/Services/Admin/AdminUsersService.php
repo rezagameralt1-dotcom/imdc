@@ -232,26 +232,33 @@ class AdminUsersService
     {
         return DB::connection('core')->transaction(function () use ($roleName, $permissionNames) {
             // Use Spatie Role model for permission assignment
-            SpatieRole::setConnection('core');
-            $role = SpatieRole::where('name', $roleName)->first();
+            $role = SpatieRole::on('core')->where('name', $roleName)->first();
             
             if (!$role) {
                 throw new \DomainException("Role not found: {$roleName}");
             }
             
-            // Validate permission names exist
-            $validPermissions = Permission::on('core')
+            // Get role's guard_name (default to config or 'api')
+            $guard = $role->guard_name ?? config('permission.defaults.guard_name', 'api');
+            
+            // Validate permission names exist for the role's guard
+            $validPermissionModels = Permission::on('core')
+                ->where('guard_name', $guard)
                 ->whereIn('name', $permissionNames)
-                ->pluck('name')
-                ->toArray();
-            $invalidPermissions = array_diff($permissionNames, $validPermissions);
+                ->get();
+            
+            $validPermissionNames = $validPermissionModels->pluck('name')->toArray();
+            $invalidPermissions = array_diff($permissionNames, $validPermissionNames);
             
             if (!empty($invalidPermissions)) {
-                throw new \DomainException('Invalid permission names: ' . implode(', ', $invalidPermissions));
+                throw new \DomainException(
+                    'Invalid permission names for guard "' . $guard . '": ' . implode(', ', $invalidPermissions)
+                );
             }
             
             // Use Spatie's givePermissionTo for idempotent assignment (no duplicates)
-            foreach ($validPermissions as $permissionName) {
+            // givePermissionTo accepts permission names and will match by guard automatically
+            foreach ($validPermissionNames as $permissionName) {
                 $role->givePermissionTo($permissionName);
             }
             
