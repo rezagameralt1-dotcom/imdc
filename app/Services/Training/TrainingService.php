@@ -397,6 +397,12 @@ class TrainingService
             }
 
             // Issue skill NFT (idempotent via unique constraint)
+            // Load course relationship if needed
+            if (!$enrollment->relationLoaded('course')) {
+                $enrollment->load('course');
+            }
+            $courseTitle = $enrollment->course?->title ?? 'Unknown';
+            
             $skillNft = SkillNft::on('core')->firstOrCreate(
                 [
                     'course_id' => $enrollment->course_id,
@@ -405,7 +411,7 @@ class TrainingService
                 [
                     'did_id' => $enrollment->did_id,
                     'metadata' => [
-                        'course_title' => $enrollment->course->title ?? 'Unknown',
+                        'course_title' => $courseTitle,
                         'completed_at' => $enrollment->completed_at?->toIso8601String() ?? now()->toIso8601String(),
                     ],
                     'issued_at' => now(),

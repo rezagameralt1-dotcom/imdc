@@ -32,6 +32,6 @@ class SkillNft extends Model
 
     public function course()
     {
-        return $this->belongsTo(Course::class, 'course_id')->on('core');
+        return $this->belongsTo(Course::class, 'course_id');
     }
 }

@@ -31,6 +31,6 @@ class Course extends Model
 
     public function enrollments()
     {
-        return $this->hasMany(Enrollment::class, 'course_id')->on('core');
+        return $this->hasMany(Enrollment::class, 'course_id');
     }
 }
