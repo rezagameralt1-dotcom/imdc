@@ -111,17 +111,48 @@ class AdminUsersService
         return DB::connection('core')->transaction(function () use ($userId, $roleNames) {
             $user = User::on('core')->findOrFail($userId);
             
-            // Validate role names exist
-            $validRoles = Role::on('core')->whereIn('name', $roleNames)->pluck('name')->toArray();
-            $invalidRoles = array_diff($roleNames, $validRoles);
+            // Validate role names exist and get role IDs (direct DB query, no guard_name)
+            $roleIds = DB::connection('core')
+                ->table('roles')
+                ->whereIn('name', $roleNames)
+                ->pluck('id')
+                ->toArray();
+            
+            $validRoleNames = DB::connection('core')
+                ->table('roles')
+                ->whereIn('name', $roleNames)
+                ->pluck('name')
+                ->toArray();
+            
+            $invalidRoles = array_diff($roleNames, $validRoleNames);
             
             if (!empty($invalidRoles)) {
                 throw new \DomainException('Invalid role names: ' . implode(', ', $invalidRoles));
             }
             
-            // Sync roles (idempotent: same roles = no change)
-            // Spatie Permission's syncRoles accepts role names (strings) or role models
-            $user->syncRoles($validRoles);
+            // Sync roles via direct pivot table manipulation (idempotent, no guard_name required)
+            // Remove all existing roles for this user
+            DB::connection('core')
+                ->table('model_has_roles')
+                ->where('model_type', 'App\Models\User')
+                ->where('model_id', $userId)
+                ->delete();
+            
+            // Insert new roles (idempotent: primary key prevents duplicates)
+            $modelType = 'App\Models\User';
+            $insertData = array_map(function ($roleId) use ($userId, $modelType) {
+                return [
+                    'role_id' => $roleId,
+                    'model_id' => $userId,
+                    'model_type' => $modelType,
+                ];
+            }, $roleIds);
+            
+            if (!empty($insertData)) {
+                DB::connection('core')
+                    ->table('model_has_roles')
+                    ->insert($insertData);
+            }
             
             // Refresh to get updated roles
             $user->refresh();
