@@ -180,27 +180,6 @@ curl_http_code() {
     curl "${curl_args[@]}" "$url" || echo "000000"
 }
 
-# Pre-flight: Clear caches to ensure FEATURE_DID from .env is read at runtime
-echo "Pre-flight: Clearing caches to ensure FEATURE_DID from .env is read at runtime..."
-echo
-set +e
-php artisan config:clear 2>/dev/null || true
-php artisan cache:clear 2>/dev/null || true
-php artisan route:clear 2>/dev/null || true
-set -e
-echo "    ✓ Caches cleared"
-echo
-
-# Debug: Show effective FEATURE_DID value from .env
-echo "Debug: Checking FEATURE_DID from .env file..."
-if [[ -f "$ENV_FILE" ]]; then
-    FEATURE_DID_FROM_ENV="$(grep -E "^FEATURE_DID=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "not found")"
-    echo "  FEATURE_DID from .env: ${FEATURE_DID_FROM_ENV}"
-else
-    echo "  .env file not found"
-fi
-echo
-
 # Pre-flight: Run core migrations (for did_profiles table)
 echo "Pre-flight: Running core migrations..."
 echo
