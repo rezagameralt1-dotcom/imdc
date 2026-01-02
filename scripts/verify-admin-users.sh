@@ -235,7 +235,7 @@ echo
 echo "Test 2: Ensuring non-admin user exists and minting token..."
 set +e
 
-# Create or get non-admin user (idempotent)
+# Create or get non-admin user (idempotent) - NO role assignment to avoid guard_name queries
 NON_ADMIN_EMAIL="nonadmin.guardrail@imdc.local"
 NON_ADMIN_PASSWORD="GuardrailPass!123"
 NON_ADMIN_NAME="Guardrail NonAdmin"
@@ -247,8 +247,8 @@ require 'vendor/autoload.php';
 \$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
 
 use App\Models\User;
-use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 
 \$user = User::on('core')->where('email', '${NON_ADMIN_EMAIL}')->first();
 
@@ -260,21 +260,21 @@ if (!\$user) {
     ]);
     echo 'Created user: ' . \$user->id . '\n';
 } else {
-    echo 'User exists: ' . \$user->id . '\n';
+    // Update password to known value for deterministic login
+    \$user->password = Hash::make('${NON_ADMIN_PASSWORD}');
+    \$user->save();
+    echo 'User exists, password updated: ' . \$user->id . '\n';
 }
 
-// Ensure user does NOT have Admin role
-\$adminRole = Role::on('core')->where('name', 'Admin')->first();
-if (\$adminRole && \$user->hasRole('Admin')) {
-    \$user->roles()->detach(\$adminRole->id);
-    echo 'Removed Admin role\n';
-}
-
-// Ensure user has at least one role (User role if available)
-\$userRole = Role::on('core')->where('name', 'User')->first();
-if (\$userRole && !\$user->hasRole('User')) {
-    \$user->assignRole('User');
-    echo 'Assigned User role\n';
+// Remove Admin role if present (direct pivot table manipulation, no guard_name)
+\$adminRoleId = DB::connection('core')->table('roles')->where('name', 'Admin')->value('id');
+if (\$adminRoleId) {
+    DB::connection('core')->table('model_has_roles')
+        ->where('model_type', 'App\\\\Models\\\\User')
+        ->where('model_id', \$user->id)
+        ->where('role_id', \$adminRoleId)
+        ->delete();
+    echo 'Removed Admin role (if present)\n';
 }
 
 echo 'User ID: ' . \$user->id . '\n';
