@@ -4,7 +4,6 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use Spatie\Permission\Models\Permission;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Seed Admin Permissions
@@ -22,9 +21,6 @@ class ImdcSeedAdminPermissions extends Command
             $guardName = 'api';
             $connection = config('permission.connection', 'core');
             
-            // Ensure connection is set for Spatie models
-            Permission::setConnection($connection);
-            
             $permissions = [
                 'admin.users.read',
                 'admin.users.view',
@@ -40,21 +36,24 @@ class ImdcSeedAdminPermissions extends Command
             $existing = 0;
             
             foreach ($permissions as $permissionName) {
-                $permission = Permission::where('name', $permissionName)
-                    ->where('guard_name', $guardName)
-                    ->first();
-                
-                if (!$permission) {
-                    Permission::create([
+                // Use on() to specify connection, firstOrCreate for idempotency
+                $permission = Permission::on($connection)->firstOrCreate(
+                    [
                         'name' => $permissionName,
                         'guard_name' => $guardName,
-                    ]);
+                    ]
+                );
+                
+                if ($permission->wasRecentlyCreated) {
                     $created++;
                     $this->line("Created: {$permissionName}");
                 } else {
                     $existing++;
                 }
             }
+            
+            // Clear Spatie permission cache after seeding
+            app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
             
             if ($created > 0) {
                 $this->info("Created {$created} new permissions");
