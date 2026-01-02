@@ -19,7 +19,7 @@ return new class extends Migration
                 });
                 
                 // Backfill existing rows with 'web'
-                $connection->table('roles')->whereNull('guard_name')->update(['guard_name' => 'web']);
+                $connection->table('roles')->update(['guard_name' => 'web']);
                 
                 // Make it NOT NULL after backfill
                 Schema::connection('core')->table('roles', function (Blueprint $table) {
@@ -36,7 +36,7 @@ return new class extends Migration
                 });
                 
                 // Backfill existing rows with 'web'
-                $connection->table('permissions')->whereNull('guard_name')->update(['guard_name' => 'web']);
+                $connection->table('permissions')->update(['guard_name' => 'web']);
                 
                 // Make it NOT NULL after backfill
                 Schema::connection('core')->table('permissions', function (Blueprint $table) {
