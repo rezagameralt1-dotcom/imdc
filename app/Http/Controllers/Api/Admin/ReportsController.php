@@ -52,7 +52,7 @@ class ReportsController extends ApiController
             $filters = [
                 'user_id' => $request->input('user_id'),
                 'action' => $request->input('action'),
-                'resource_type' => $request->input('resource_type'),
+                'auditable_type' => $request->input('auditable_type'),
                 'date_from' => $request->input('date_from'),
                 'date_to' => $request->input('date_to'),
             ];
@@ -68,7 +68,7 @@ class ReportsController extends ApiController
             $data = $this->reportsService->getAuditLogs($filters, $sortBy, $sortOrder, $limit, $offset);
             return $this->successResponse($data);
         } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve audit logs: ' . $this->traceId(), 500);
+            return $this->errorResponse('Failed to retrieve audit logs: ' . $e->getMessage(), 500);
         }
     }
 }

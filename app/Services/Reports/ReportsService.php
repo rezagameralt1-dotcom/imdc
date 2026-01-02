@@ -94,8 +94,8 @@ class ReportsService
             $query->where('action', 'like', '%' . $filters['action'] . '%');
         }
         
-        if (isset($filters['resource_type'])) {
-            $query->where('resource_type', $filters['resource_type']);
+        if (isset($filters['auditable_type'])) {
+            $query->where('auditable_type', $filters['auditable_type']);
         }
         
         if (isset($filters['date_from'])) {
@@ -110,7 +110,7 @@ class ReportsService
         $total = $query->count();
         
         // Apply sorting
-        $allowedSortFields = ['created_at', 'action', 'resource_type', 'user_id'];
+        $allowedSortFields = ['created_at', 'action', 'auditable_type', 'user_id'];
         $sortBy = in_array($sortBy, $allowedSortFields) ? $sortBy : 'created_at';
         $sortOrder = strtolower($sortOrder) === 'asc' ? 'asc' : 'desc';
         
