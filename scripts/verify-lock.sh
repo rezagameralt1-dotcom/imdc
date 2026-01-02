@@ -468,8 +468,65 @@ if [[ "$FEATURE_REPORTS_ENABLED" == "true" ]]; then
         echo "✗ verify-reports.sh not found"
         ERRORS=$((ERRORS + 1))
     fi
+        else
+            echo "  SKIPPED: FEATURE_REPORTS is not enabled (FEATURE_REPORTS=${FEATURE_REPORTS_VALUE})"
+        fi
+        echo
+
+# Check 3.11: Admin Users guardrail (if FEATURE_ADMIN enabled)
+echo "Check 3.11: Admin Users guardrail (if FEATURE_ADMIN enabled)..."
+FEATURE_ADMIN_ENABLED=false
+FEATURE_ADMIN_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_ADMIN_FROM_ENV="$(grep -E "^FEATURE_ADMIN=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_ADMIN_FROM_ENV" ]]; then
+        FEATURE_ADMIN_VALUE="$FEATURE_ADMIN_FROM_ENV"
+        FEATURE_ADMIN_NORMALIZED="$(echo "$FEATURE_ADMIN_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_ADMIN_NORMALIZED" == "true" ]] || [[ "$FEATURE_ADMIN_NORMALIZED" == "1" ]] || [[ "$FEATURE_ADMIN_NORMALIZED" == "yes" ]] || [[ "$FEATURE_ADMIN_NORMALIZED" == "on" ]]; then
+            FEATURE_ADMIN_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_ADMIN_VALUE" ]]; then
+    FEATURE_ADMIN_VALUE="${FEATURE_ADMIN:-false}"
+    if [[ "$FEATURE_ADMIN_VALUE" == "true" ]] || [[ "$FEATURE_ADMIN_VALUE" == "1" ]]; then
+        FEATURE_ADMIN_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_ADMIN_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-admin-users.sh" ]]; then
+        ADMIN_USERS_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-admin-users.sh --in-container > /tmp/admin_users_guardrail_output.txt 2>&1 || ADMIN_USERS_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f backend/infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_ADMIN=true FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-admin-users.sh --in-container" > /tmp/admin_users_guardrail_output.txt 2>&1 || ADMIN_USERS_EXIT=$?
+        else
+            FEATURE_ADMIN=true FEATURE_REPORTS=true "$SCRIPT_DIR/verify-admin-users.sh" > /tmp/admin_users_guardrail_output.txt 2>&1 || ADMIN_USERS_EXIT=$?
+        fi
+        
+        if [[ $ADMIN_USERS_EXIT -eq 0 ]]; then
+            if grep -q "All admin users tests PASSED" /tmp/admin_users_guardrail_output.txt; then
+                echo "✓ Admin Users guardrail PASSED"
+            else
+                echo "✗ Admin Users guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Admin Users guardrail execution failed (exit code: $ADMIN_USERS_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-admin-users.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
 else
-    echo "  SKIPPED: FEATURE_REPORTS is not enabled (FEATURE_REPORTS=${FEATURE_REPORTS_VALUE})"
+    echo "  SKIPPED: FEATURE_ADMIN is not enabled (FEATURE_ADMIN=${FEATURE_ADMIN_VALUE})"
 fi
 echo
 

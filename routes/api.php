@@ -164,6 +164,16 @@ Route::prefix('v1')->group(function () {
             Route::get('health', [\App\Http\Controllers\Api\Admin\HealthController::class, 'index'])
                 ->middleware('role:Admin');
         });
+
+        // Admin Users Management routes (gated by FEATURE_ADMIN)
+        Route::middleware(['feature:admin'])->prefix('admin')->group(function () {
+            Route::get('users', [\App\Http\Controllers\Api\Admin\UsersController::class, 'index'])
+                ->middleware('role:Admin');
+            Route::get('users/{id}', [\App\Http\Controllers\Api\Admin\UsersController::class, 'show'])
+                ->middleware('role:Admin');
+            Route::put('users/{id}/roles', [\App\Http\Controllers\Api\Admin\UsersController::class, 'assignRoles'])
+                ->middleware('role:Admin');
+        });
     });
 });
 

@@ -24,6 +24,7 @@ class EnsureFeatureEnabled
                     'vr' => config('vr.enabled', false),
                     'training' => config('training.enabled', false),
                     'reports' => config('reports.enabled', false),
+                    'admin' => config('admin.enabled', false),
                     default => false,
                 };
 
