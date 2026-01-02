@@ -266,8 +266,15 @@ if (!\$user) {
 // Ensure user does NOT have Admin role
 \$adminRole = Role::on('core')->where('name', 'Admin')->first();
 if (\$adminRole && \$user->hasRole('Admin')) {
-    \$user->removeRole('Admin');
+    \$user->roles()->detach(\$adminRole->id);
     echo 'Removed Admin role\n';
+}
+
+// Ensure user has at least one role (User role if available)
+\$userRole = Role::on('core')->where('name', 'User')->first();
+if (\$userRole && !\$user->hasRole('User')) {
+    \$user->assignRole('User');
+    echo 'Assigned User role\n';
 }
 
 echo 'User ID: ' . \$user->id . '\n';
