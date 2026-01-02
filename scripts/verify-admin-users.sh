@@ -231,21 +231,90 @@ fi
 echo "✓ Admin token minted (${#ADMIN_TOKEN} chars)"
 echo
 
-# Test 2: Mint non-admin token (create a regular user if needed)
-echo "Test 2: Minting authentication token for non-admin user..."
+# Test 2: Ensure non-admin user exists and mint token
+echo "Test 2: Ensuring non-admin user exists and minting token..."
 set +e
-# Try to get or create a non-admin user
-NON_ADMIN_EMAIL="user@imdc.local"
-NON_ADMIN_TOKEN="$(FEATURE_ADMIN=true FEATURE_REPORTS=true php artisan imdc:mint-debug-token --email="${NON_ADMIN_EMAIL}" --database=core 2>/dev/null | tail -n 1 | tr -d "\r\n")"
-NON_ADMIN_TOKEN_EXIT=$?
-set -e
 
-if [ $NON_ADMIN_TOKEN_EXIT -ne 0 ] || [ -z "$NON_ADMIN_TOKEN" ]; then
-    echo "✗ Non-admin token mint failed"
+# Create or get non-admin user (idempotent)
+NON_ADMIN_EMAIL="nonadmin.guardrail@imdc.local"
+NON_ADMIN_PASSWORD="GuardrailPass!123"
+NON_ADMIN_NAME="Guardrail NonAdmin"
+
+echo "  Creating/ensuring non-admin user: ${NON_ADMIN_EMAIL}..."
+USER_CREATE_OUTPUT="$(php -r "
+require 'vendor/autoload.php';
+\$app = require 'bootstrap/app.php';
+\$app->make('Illuminate\Contracts\Console\Kernel')->bootstrap();
+
+use App\Models\User;
+use App\Models\Role;
+use Illuminate\Support\Facades\Hash;
+
+\$user = User::on('core')->where('email', '${NON_ADMIN_EMAIL}')->first();
+
+if (!\$user) {
+    \$user = User::on('core')->create([
+        'name' => '${NON_ADMIN_NAME}',
+        'email' => '${NON_ADMIN_EMAIL}',
+        'password' => Hash::make('${NON_ADMIN_PASSWORD}'),
+    ]);
+    echo 'Created user: ' . \$user->id . '\n';
+} else {
+    echo 'User exists: ' . \$user->id . '\n';
+}
+
+// Ensure user does NOT have Admin role
+\$adminRole = Role::on('core')->where('name', 'Admin')->first();
+if (\$adminRole && \$user->hasRole('Admin')) {
+    \$user->removeRole('Admin');
+    echo 'Removed Admin role\n';
+}
+
+echo 'User ID: ' . \$user->id . '\n';
+" 2>&1)"
+
+if [ $? -ne 0 ]; then
+    echo "✗ Failed to create/ensure non-admin user"
+    echo "$USER_CREATE_OUTPUT"
     exit 1
 fi
 
-echo "✓ Non-admin token minted (${#NON_ADMIN_TOKEN} chars)"
+echo "$USER_CREATE_OUTPUT"
+
+# Mint token via login endpoint
+echo "  Logging in to get non-admin token..."
+LOGIN_RESPONSE="$(curl -sS -w "\n%{http_code}" -X POST "${API_BASE_URL}/api/v1/auth/login" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    -d "{\"email\":\"${NON_ADMIN_EMAIL}\",\"password\":\"${NON_ADMIN_PASSWORD}\"}" \
+    -o "$TMP_BODY" 2>&1 || echo "000000")"
+
+HTTP_CODE="$(echo "$LOGIN_RESPONSE" | tail -n 1)"
+RESPONSE_BODY="$(cat "$TMP_BODY" 2>/dev/null || echo '{}')"
+
+if [[ "$HTTP_CODE" != "200" ]]; then
+    echo "✗ Non-admin login failed (HTTP ${HTTP_CODE})"
+    echo "  Response body:"
+    echo "$RESPONSE_BODY" | head -10
+    exit 1
+fi
+
+# Extract token from response
+NON_ADMIN_TOKEN="$(echo "$RESPONSE_BODY" | grep -oE '"token"[[:space:]]*:[[:space:]]*"([^"]+)"' | sed -nE 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1 || echo '')"
+
+if [ -z "$NON_ADMIN_TOKEN" ]; then
+    # Try alternative response format (data.token)
+    NON_ADMIN_TOKEN="$(echo "$RESPONSE_BODY" | grep -oE '"data"[^}]*"token"[[:space:]]*:[[:space:]]*"([^"]+)"' | sed -nE 's/.*"token"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/p' | head -1 || echo '')"
+fi
+
+if [ -z "$NON_ADMIN_TOKEN" ]; then
+    echo "✗ Failed to extract token from login response"
+    echo "  Response body:"
+    echo "$RESPONSE_BODY" | head -20
+    exit 1
+fi
+
+echo "✓ Non-admin token obtained (${#NON_ADMIN_TOKEN} chars)"
 echo
 
 # Test 3: Confirm non-admin gets 403 on /api/v1/admin/users
