@@ -63,17 +63,16 @@ class DashboardService
         return [
             'system_overview' => $systemOverview,
             'recent_guardrail_runs' => $guardrailRuns,
-            'audit_logs_summary' => [
-                'total_count' => $auditLogsTotal,
-                'recent_logs' => $auditLogsRecent,
+            'audit_logs' => [
+                'total' => $auditLogsTotal,
+                'latest' => $auditLogsRecent,
             ],
             'rbac_stats' => [
-                'roles_count' => $rolesCount,
-                'permissions_count' => $permissionsCount,
-                'users_count' => $usersCount,
-                'admins_count' => $adminsCount,
+                'users_total' => $usersCount,
+                'admins_total' => $adminsCount,
+                'roles_total' => $rolesCount,
+                'permissions_total' => $permissionsCount,
             ],
-            'generated_at' => now()->toIso8601String(),
         ];
     }
 }

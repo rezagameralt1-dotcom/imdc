@@ -372,8 +372,14 @@ fi
 DASHBOARD_RESPONSE="$(cat "$TMP_BODY" 2>/dev/null || echo '{}')"
 HAS_SYSTEM_OVERVIEW="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['system_overview']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
 HAS_GUARDRAIL_RUNS="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['recent_guardrail_runs']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
-HAS_AUDIT_LOGS="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['audit_logs_summary']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_AUDIT_LOGS="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['audit_logs']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_AUDIT_LOGS_TOTAL="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['audit_logs']['total']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_AUDIT_LOGS_LATEST="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['audit_logs']['latest']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
 HAS_RBAC_STATS="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['rbac_stats']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_RBAC_USERS_TOTAL="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['rbac_stats']['users_total']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_RBAC_ADMINS_TOTAL="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['rbac_stats']['admins_total']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_RBAC_ROLES_TOTAL="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['rbac_stats']['roles_total']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
+HAS_RBAC_PERMISSIONS_TOTAL="$(echo "$DASHBOARD_RESPONSE" | php -r "require 'vendor/autoload.php'; \$data = json_decode(file_get_contents('php://stdin'), true); echo isset(\$data['data']['rbac_stats']['permissions_total']) ? 'yes' : 'no';" 2>/dev/null || echo 'no')"
 
 if [[ "$HAS_SYSTEM_OVERVIEW" != "yes" ]]; then
     echo "✗ Dashboard response missing 'system_overview' key"
@@ -384,11 +390,35 @@ if [[ "$HAS_GUARDRAIL_RUNS" != "yes" ]]; then
     exit 1
 fi
 if [[ "$HAS_AUDIT_LOGS" != "yes" ]]; then
-    echo "✗ Dashboard response missing 'audit_logs_summary' key"
+    echo "✗ Dashboard response missing 'audit_logs' key"
+    exit 1
+fi
+if [[ "$HAS_AUDIT_LOGS_TOTAL" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'audit_logs.total' key"
+    exit 1
+fi
+if [[ "$HAS_AUDIT_LOGS_LATEST" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'audit_logs.latest' key"
     exit 1
 fi
 if [[ "$HAS_RBAC_STATS" != "yes" ]]; then
     echo "✗ Dashboard response missing 'rbac_stats' key"
+    exit 1
+fi
+if [[ "$HAS_RBAC_USERS_TOTAL" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'rbac_stats.users_total' key"
+    exit 1
+fi
+if [[ "$HAS_RBAC_ADMINS_TOTAL" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'rbac_stats.admins_total' key"
+    exit 1
+fi
+if [[ "$HAS_RBAC_ROLES_TOTAL" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'rbac_stats.roles_total' key"
+    exit 1
+fi
+if [[ "$HAS_RBAC_PERMISSIONS_TOTAL" != "yes" ]]; then
+    echo "✗ Dashboard response missing 'rbac_stats.permissions_total' key"
     exit 1
 fi
 
