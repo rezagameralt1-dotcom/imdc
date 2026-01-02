@@ -8,24 +8,27 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        // Ensure did_id column exists and is nullable UUID (no FK by default)
         if (Schema::hasTable('enrollments') && !Schema::hasColumn('enrollments', 'did_id')) {
             Schema::table('enrollments', function (Blueprint $table) {
                 $table->uuid('did_id')->nullable()->after('user_id');
             });
         }
 
+        // Drop FK if it exists (idempotent)
         try {
             $fkName = 'pub_enrollments_did_id_foreign';
-            $existsFk = DB::connection('core')->selectOne("""
-                select 1
-                from pg_constraint c
-                join pg_class t on t.oid = c.conrelid
-                join pg_namespace n on n.oid = t.relnamespace
-                where n.nspname = 'pub'
-                  and t.relname = 'enrollments'
-                  and c.conname = ?
-                limit 1
-            """, [$fkName]);
+            $existsFk = DB::connection('core')->selectOne(
+                "select 1
+                 from pg_constraint c
+                 join pg_class t on t.oid = c.conrelid
+                 join pg_namespace n on n.oid = t.relnamespace
+                 where n.nspname = 'pub'
+                   and t.relname = 'enrollments'
+                   and c.conname = ?
+                 limit 1",
+                [$fkName]
+            );
 
             if ($existsFk) {
                 Schema::table('enrollments', function (Blueprint $table) use ($fkName) {
@@ -33,33 +36,40 @@ return new class extends Migration {
                 });
             }
         } catch (\Throwable $e) {
+            // ignore
         }
 
-        $didProfilesExists = DB::connection('core')->selectOne("""
-            select 1
-            from information_schema.tables
-            where table_schema = 'pub' and table_name = 'did_profiles'
-            limit 1
-        """);
+        // Create FK ONLY if did_profiles exists in pub schema
+        try {
+            $didProfilesExists = DB::connection('core')->selectOne(
+                "select 1
+                 from information_schema.tables
+                 where table_schema = 'pub' and table_name = 'did_profiles'
+                 limit 1"
+            );
 
-        if ($didProfilesExists) {
-            $fkName = 'pub_enrollments_did_id_foreign';
-            $existsFk = DB::connection('core')->selectOne("""
-                select 1
-                from pg_constraint c
-                join pg_class t on t.oid = c.conrelid
-                join pg_namespace n on n.oid = t.relnamespace
-                where n.nspname = 'pub'
-                  and t.relname = 'enrollments'
-                  and c.conname = ?
-                limit 1
-            """, [$fkName]);
+            if ($didProfilesExists) {
+                $fkName = 'pub_enrollments_did_id_foreign';
+                $existsFk = DB::connection('core')->selectOne(
+                    "select 1
+                     from pg_constraint c
+                     join pg_class t on t.oid = c.conrelid
+                     join pg_namespace n on n.oid = t.relnamespace
+                     where n.nspname = 'pub'
+                       and t.relname = 'enrollments'
+                       and c.conname = ?
+                     limit 1",
+                    [$fkName]
+                );
 
-            if (!$existsFk) {
-                Schema::table('enrollments', function (Blueprint $table) {
-                    $table->foreign('did_id')->references('id')->on('did_profiles')->nullOnDelete();
-                });
+                if (!$existsFk) {
+                    Schema::table('enrollments', function (Blueprint $table) {
+                        $table->foreign('did_id')->references('id')->on('did_profiles')->nullOnDelete();
+                    });
+                }
             }
+        } catch (\Throwable $e) {
+            // ignore
         }
     }
 
@@ -69,6 +79,8 @@ return new class extends Migration {
             Schema::table('enrollments', function (Blueprint $table) {
                 $table->dropForeign('pub_enrollments_did_id_foreign');
             });
-        } catch (\Throwable $e) {}
+        } catch (\Throwable $e) {
+            // ignore
+        }
     }
 };
