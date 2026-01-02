@@ -411,8 +411,65 @@ if [[ "$FEATURE_TRAINING_ENABLED" == "true" ]]; then
         echo "✗ verify-training.sh not found"
         ERRORS=$((ERRORS + 1))
     fi
+        else
+            echo "  SKIPPED: FEATURE_TRAINING is not enabled (FEATURE_TRAINING=${FEATURE_TRAINING_VALUE})"
+        fi
+        echo
+
+# Check 3.10: Reports guardrail (if FEATURE_REPORTS enabled)
+echo "Check 3.10: Reports guardrail (if FEATURE_REPORTS enabled)..."
+FEATURE_REPORTS_ENABLED=false
+FEATURE_REPORTS_VALUE=""
+
+# Read from .env file first (deterministic)
+if [[ -f "$ENV_FILE" ]]; then
+    FEATURE_REPORTS_FROM_ENV="$(grep -E "^FEATURE_REPORTS=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- | tr -d '\r\n' || echo "")"
+    if [[ -n "$FEATURE_REPORTS_FROM_ENV" ]]; then
+        FEATURE_REPORTS_VALUE="$FEATURE_REPORTS_FROM_ENV"
+        FEATURE_REPORTS_NORMALIZED="$(echo "$FEATURE_REPORTS_FROM_ENV" | tr '[:upper:]' '[:lower:]' | tr -d ' ')"
+        if [[ "$FEATURE_REPORTS_NORMALIZED" == "true" ]] || [[ "$FEATURE_REPORTS_NORMALIZED" == "1" ]] || [[ "$FEATURE_REPORTS_NORMALIZED" == "yes" ]] || [[ "$FEATURE_REPORTS_NORMALIZED" == "on" ]]; then
+            FEATURE_REPORTS_ENABLED=true
+        fi
+    fi
+fi
+
+# Fallback to shell env if not in .env
+if [[ -z "$FEATURE_REPORTS_VALUE" ]]; then
+    FEATURE_REPORTS_VALUE="${FEATURE_REPORTS:-false}"
+    if [[ "$FEATURE_REPORTS_VALUE" == "true" ]] || [[ "$FEATURE_REPORTS_VALUE" == "1" ]]; then
+        FEATURE_REPORTS_ENABLED=true
+    fi
+fi
+
+if [[ "$FEATURE_REPORTS_ENABLED" == "true" ]]; then
+    if [[ -f "$SCRIPT_DIR/verify-reports.sh" ]]; then
+        REPORTS_EXIT=0
+        if is_container "${1:-}"; then
+            cd /var/www/html || exit 1
+            FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 ./scripts/verify-reports.sh --in-container > /tmp/reports_guardrail_output.txt 2>&1 || REPORTS_EXIT=$?
+        elif has_docker_compose; then
+            docker compose -f backend/infra/docker/docker-compose.yml exec -T app sh -lc "cd /var/www/html && FEATURE_REPORTS=true IMDC_API_BASE_URL=http://web:80 /var/www/html/scripts/verify-reports.sh --in-container" > /tmp/reports_guardrail_output.txt 2>&1 || REPORTS_EXIT=$?
+        else
+            FEATURE_REPORTS=true "$SCRIPT_DIR/verify-reports.sh" > /tmp/reports_guardrail_output.txt 2>&1 || REPORTS_EXIT=$?
+        fi
+        
+        if [[ $REPORTS_EXIT -eq 0 ]]; then
+            if grep -q "All reports tests PASSED" /tmp/reports_guardrail_output.txt; then
+                echo "✓ Reports guardrail PASSED"
+            else
+                echo "✗ Reports guardrail did not report PASS"
+                ERRORS=$((ERRORS + 1))
+            fi
+        else
+            echo "✗ Reports guardrail execution failed (exit code: $REPORTS_EXIT)"
+            ERRORS=$((ERRORS + 1))
+        fi
+    else
+        echo "✗ verify-reports.sh not found"
+        ERRORS=$((ERRORS + 1))
+    fi
 else
-    echo "  SKIPPED: FEATURE_TRAINING is not enabled (FEATURE_TRAINING=${FEATURE_TRAINING_VALUE})"
+    echo "  SKIPPED: FEATURE_REPORTS is not enabled (FEATURE_REPORTS=${FEATURE_REPORTS_VALUE})"
 fi
 echo
 

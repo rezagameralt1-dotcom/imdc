@@ -149,6 +149,21 @@ Route::prefix('v1')->group(function () {
             Route::post('enrollments/{id}/complete', [\App\Http\Controllers\Api\Training\EnrollmentController::class, 'complete'])
                 ->middleware('role:Admin|Teacher');
         });
+
+        // Admin Panel routes (always registered; feature flag checked by middleware)
+        Route::middleware(['feature:reports'])->prefix('admin')->group(function () {
+            // Reports endpoints
+            Route::get('reports/system-overview', [\App\Http\Controllers\Api\Admin\ReportsController::class, 'systemOverview'])
+                ->middleware('role:Admin');
+            Route::get('reports/guardrail-runs', [\App\Http\Controllers\Api\Admin\ReportsController::class, 'guardrailRuns'])
+                ->middleware('role:Admin');
+            Route::get('reports/audit-logs', [\App\Http\Controllers\Api\Admin\ReportsController::class, 'auditLogs'])
+                ->middleware('role:Admin');
+
+            // Admin health check
+            Route::get('health', [\App\Http\Controllers\Api\Admin\HealthController::class, 'index'])
+                ->middleware('role:Admin');
+        });
     });
 });
 

@@ -23,6 +23,7 @@ class EnsureFeatureEnabled
                     'pharma' => config('pharma.enabled', false),
                     'vr' => config('vr.enabled', false),
                     'training' => config('training.enabled', false),
+                    'reports' => config('reports.enabled', false),
                     default => false,
                 };
 
