@@ -50,26 +50,8 @@ return new class extends Migration
                     $table->foreign('user_id')->references('id')->on('pub.users')->onDelete('restrict');
                 }
                 
-                // Check if did_profiles exists in pub schema or default
-                $didExists = DB::connection('core')->selectOne("
-                    SELECT EXISTS (
-                        SELECT FROM information_schema.tables 
-                        WHERE (table_schema = 'pub' AND table_name = 'did_profiles')
-                        OR (table_schema = 'public' AND table_name = 'did_profiles')
-                    ) as exists
-                ");
-                if ($didExists && $didExists->exists) {
-                    // Try pub.did_profiles first, then public.did_profiles
-                    try {
-                        $table->foreign('did_id')->references('id')->on('pub.did_profiles')->onDelete('set null');
-                    } catch (\Exception $e) {
-                        try {
-                            $table->foreign('did_id')->references('id')->on('did_profiles')->onDelete('set null');
-                        } catch (\Exception $e2) {
-                            // Skip FK if both fail
-                        }
-                    }
-                }
+                // NOTE: did_id FK is handled in a separate migration (2026_01_07_100004)
+                // to ensure it's only created if did_profiles exists
             } catch (\Exception $e) {
                 // FK may not be supported, skip
             }
